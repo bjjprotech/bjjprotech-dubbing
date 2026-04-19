@@ -6,10 +6,12 @@ Recebe jobs via HTTP, processa com FFmpeg, re-faz upload no Bunny.
 import os, json, base64, subprocess, tempfile, threading, time, requests
 from pathlib import Path
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 app = Flask(__name__)
 # Aumenta limite de requisição para 200MB (WAVs grandes em base64)
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
+CORS(app)  # Permite chamadas de qualquer origem (browser → Railway)
 
 JOBS = {}
 JOBS_LOCK = threading.Lock()
