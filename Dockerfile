@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir flask requests flask-cors
 
 WORKDIR /app
 COPY server.py .
+COPY app.html .
 
 EXPOSE 8080
 
