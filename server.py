@@ -8,6 +8,8 @@ from pathlib import Path
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
+# Aumenta limite de requisição para 200MB (WAVs grandes em base64)
+app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
 
 JOBS = {}
 JOBS_LOCK = threading.Lock()
@@ -106,7 +108,7 @@ def process_job(job_id, payload):
             video_url = f"https://{cdn_host}/{video_guid}/play_720p.mp4"
             orig_path = tmp / 'original.mp4'
             log(f"  Download: {video_url}")
-            download_file(video_url, orig_path, headers={"AccessKey": api_key})
+            download_file(video_url, orig_path)
 
             # 2. Salvar WAVs
             update_job(job_id, progress=35, message='Preparando faixas de áudio...')
@@ -178,8 +180,6 @@ def process_job(job_id, payload):
         log(f"=== Job {job_id} ERRO: {e} ===\n{traceback.format_exc()}")
         update_job(job_id, status='error', message=str(e)[:200])
 
-# ── Endpoints ──────────────────────────────────────────────────────────────────
-
 @app.route('/health', methods=['GET'])
 def health():
     ffmpeg_ok = subprocess.run(['ffmpeg','-version'], capture_output=True).returncode == 0
@@ -187,7 +187,7 @@ def health():
 
 @app.route('/job', methods=['POST'])
 def create_job():
-    payload = request.get_json()
+    payload = request.get_json(force=True)
     if not payload:
         return jsonify({"error": "JSON inválido"}), 400
     required = ['library_id','api_key','cdn_host','video_guid','video_title','audio_tracks']
