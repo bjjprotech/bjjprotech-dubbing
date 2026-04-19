@@ -37,16 +37,81 @@ def download_file(url, dest, headers=None):
                 log(f"  Download: {done/total*100:.1f}% ({done//1024//1024}MB/{total//1024//1024}MB)")
     return done
 
-def upload_to_bunny(video_guid, library_id, api_key, file_path):
-    url = f"https://video.bunnycdn.com/library/{library_id}/videos/{video_guid}"
-    headers = {"AccessKey": api_key, "Content-Type": "application/octet-stream"}
+# Serve merged video temporarily for Bunny Fetch
+# We use a simple in-memory store: {token: (filepath, keep_alive)}
+TEMP_FILES = {}
+TEMP_FILES_LOCK = threading.Lock()
+
+def serve_temp_file(file_path):
+    """Registra arquivo para servir temporariamente e retorna token único."""
+    import uuid
+    token = str(uuid.uuid4()).replace('-','')
+    with TEMP_FILES_LOCK:
+        TEMP_FILES[token] = str(file_path)
+    return token
+
+def upload_to_bunny(video_guid, library_id, api_key, file_path, video_title):
+    """
+    Estratégia: Railway serve o vídeo mesclado temporariamente →
+    Bunny Fetch API baixa da URL do Railway e substitui o vídeo
+    no mesmo GUID → GUID preservado, player embed intacto.
+    """
+    base = f"https://video.bunnycdn.com/library/{library_id}"
     file_size = os.path.getsize(file_path)
-    log(f"  Upload: {file_size//1024//1024}MB → Bunny ID: {video_guid[:8]}...")
-    with open(file_path, 'rb') as f:
-        r = requests.put(url, headers=headers, data=f, timeout=3600)
-    if r.status_code not in (200, 201):
-        raise RuntimeError(f"Upload falhou: HTTP {r.status_code} — {r.text[:200]}")
-    log(f"  Upload OK — ID preservado: {video_guid}")
+    log(f"  Vídeo mesclado: {file_size//1024//1024}MB")
+
+    # 1. Pegar URL pública do Railway
+    railway_url = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
+    if not railway_url:
+        railway_url = os.environ.get('RAILWAY_STATIC_URL', '')
+    if not railway_url:
+        raise RuntimeError("RAILWAY_PUBLIC_DOMAIN não configurado nas variáveis do Railway.")
+    if not railway_url.startswith('http'):
+        railway_url = f"https://{railway_url}"
+
+    # 2. Registrar arquivo para servir
+    token = serve_temp_file(file_path)
+    temp_url = f"{railway_url}/temp/{token}"
+    log(f"  Servindo temporariamente em: {temp_url}")
+
+    try:
+        # 3. Chamar Bunny Fetch no GUID existente — substitui o arquivo preservando ID
+        log(f"  Chamando Bunny Fetch no GUID {video_guid[:8]} (preserva embed)...")
+        r = requests.post(
+            f"{base}/videos/{video_guid}/fetch",
+            headers={
+                "AccessKey": api_key,
+                "Content-Type": "application/json",
+                "accept": "application/json"
+            },
+            json={"url": temp_url},
+            timeout=60
+        )
+
+        log(f"  Bunny Fetch resposta: HTTP {r.status_code} — {r.text[:150]}")
+
+        if r.status_code not in (200, 201, 202):
+            # Se fetch falhar, tenta upload direto como fallback
+            log(f"  Fetch falhou, tentando upload direto como fallback...")
+            headers_bin = {"AccessKey": api_key, "Content-Type": "application/octet-stream"}
+            with open(file_path, 'rb') as f:
+                r2 = requests.put(f"{base}/videos/{video_guid}", headers=headers_bin, data=f, timeout=3600)
+            if r2.status_code not in (200, 201):
+                raise RuntimeError(f"Upload direto também falhou: HTTP {r2.status_code} — {r2.text[:200]}")
+            log(f"  Upload direto OK como fallback")
+        else:
+            log(f"  Bunny Fetch aceito — GUID {video_guid} preservado!")
+            # Aguarda Bunny começar o download antes de limpar o arquivo
+            log(f"  Aguardando Bunny iniciar download (60s)...")
+            time.sleep(60)
+
+    finally:
+        # Limpa arquivo temporário
+        with TEMP_FILES_LOCK:
+            TEMP_FILES.pop(token, None)
+        log(f"  Arquivo temporário removido")
+
+    return video_guid
 
 def upload_caption(video_guid, library_id, api_key, lang, label, srt_content):
     b64 = base64.b64encode(srt_content.encode('utf-8')).decode('ascii')
@@ -188,13 +253,13 @@ def process_job(job_id, payload):
                 raise RuntimeError(f"FFmpeg código {result.returncode}: {result.stderr[-300:]}")
             log(f"  FFmpeg OK: {merged_path.stat().st_size//1024//1024}MB")
 
-            # 4. Upload
-            update_job(job_id, progress=60, message='Fazendo re-upload no Bunny...')
-            upload_to_bunny(video_guid, library_id, api_key, merged_path)
+            # 4. Upload via Bunny Fetch (preserva GUID original)
+            update_job(job_id, progress=60, message='Enviando vídeo para Bunny (Fetch API)...')
+            new_guid = upload_to_bunny(video_guid, library_id, api_key, merged_path, video_title)
 
             # 5. Aguardar encoding
             update_job(job_id, progress=75, message='Aguardando re-encoding no Bunny...')
-            wait_for_encoding(video_guid, library_id, api_key)
+            wait_for_encoding(new_guid, library_id, api_key)
 
             # 6. Legendas
             update_job(job_id, progress=90, message='Enviando legendas SRT...')
@@ -202,12 +267,12 @@ def process_job(job_id, payload):
                            'es':'Español (ES)','fr':'Français (FR)'}
             for lang, srt_content in srts.items():
                 if not srt_content.strip(): continue
-                ok_cap = upload_caption(video_guid, library_id, api_key,
+                ok_cap = upload_caption(new_guid, library_id, api_key,
                                         lang, LANG_LABELS.get(lang, lang), srt_content)
                 log(f"  Legenda {lang.upper()}: {'OK' if ok_cap else 'WARN'}")
 
         update_job(job_id, status='done', progress=100,
-                   message=f'Concluído! Vídeo {video_guid[:8]} atualizado no Bunny.')
+                   message=f'Concluído! GUID preservado: {new_guid} — vídeo com multi-audio no Bunny!')
         log(f"=== Job {job_id} CONCLUÍDO ===")
 
     except Exception as e:
@@ -218,7 +283,19 @@ def process_job(job_id, payload):
 @app.route('/health', methods=['GET'])
 def health():
     ffmpeg_ok = subprocess.run(['ffmpeg','-version'], capture_output=True).returncode == 0
-    return jsonify({"status": "ok", "ffmpeg": ffmpeg_ok})
+    railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', 'não configurado')
+    return jsonify({"status": "ok", "ffmpeg": ffmpeg_ok, "domain": railway_domain})
+
+@app.route('/temp/<token>', methods=['GET'])
+def serve_temp(token):
+    """Serve arquivo temporário para o Bunny Fetch baixar."""
+    from flask import send_file, abort
+    with TEMP_FILES_LOCK:
+        file_path = TEMP_FILES.get(token)
+    if not file_path or not os.path.exists(file_path):
+        abort(404)
+    log(f"  Bunny baixando arquivo temporário: {token[:8]}...")
+    return send_file(file_path, mimetype='video/mp4')
 
 @app.route('/job', methods=['POST'])
 def create_job():
