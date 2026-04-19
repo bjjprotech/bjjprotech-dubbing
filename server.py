@@ -118,10 +118,22 @@ def process_job(job_id, payload):
             for track in audio_tracks:
                 lang     = track['lang']
                 wav_data = base64.b64decode(track['wav_b64'])
-                wav_path = tmp / f'dub_{lang}.wav'
-                wav_path.write_bytes(wav_data)
-                wav_paths[lang] = wav_path
-                log(f"  WAV {lang.upper()}: {len(wav_data)//1024}KB")
+                raw_path = tmp / f'dub_{lang}_raw.wav'
+                raw_path.write_bytes(wav_data)
+                # Convert to standard PCM WAV that FFmpeg accepts reliably
+                conv_path = tmp / f'dub_{lang}.wav'
+                conv_result = subprocess.run([
+                    'ffmpeg', '-y', '-i', str(raw_path),
+                    '-ar', '44100', '-ac', '1', '-c:a', 'pcm_s16le',
+                    str(conv_path)
+                ], capture_output=True, text=True)
+                if conv_result.returncode == 0:
+                    wav_paths[lang] = conv_path
+                    log(f"  WAV {lang.upper()}: {conv_path.stat().st_size//1024}KB (convertido)")
+                else:
+                    # Use raw if conversion fails
+                    wav_paths[lang] = raw_path
+                    log(f"  WAV {lang.upper()}: {len(wav_data)//1024}KB (raw)")
 
             # 3. FFmpeg
             update_job(job_id, progress=45, message='Mesclando faixas com FFmpeg...')
@@ -150,9 +162,13 @@ def process_job(job_id, payload):
             cmd.append(str(merged_path))
 
             log(f"  FFmpeg iniciando...")
+            log(f"  CMD: {' '.join(cmd[:12])}")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
             if result.returncode != 0:
-                raise RuntimeError(f"FFmpeg falhou:\n{result.stderr[-600:]}")
+                # Show last 1000 chars of stderr for debugging
+                err_detail = result.stderr[-1000:] if result.stderr else "sem stderr"
+                log(f"  FFmpeg STDERR: {err_detail}")
+                raise RuntimeError(f"FFmpeg código {result.returncode}: {result.stderr[-300:]}")
             log(f"  FFmpeg OK: {merged_path.stat().st_size//1024//1024}MB")
 
             # 4. Upload
