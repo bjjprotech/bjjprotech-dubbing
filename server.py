@@ -286,6 +286,16 @@ def health():
     railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', 'não configurado')
     return jsonify({"status": "ok", "ffmpeg": ffmpeg_ok, "domain": railway_domain})
 
+@app.route('/', methods=['GET'])
+@app.route('/app', methods=['GET'])
+def serve_app():
+    """Serve a aplicação HTML diretamente do Railway."""
+    from flask import send_file
+    app_path = os.path.join(os.path.dirname(__file__), 'app.html')
+    if os.path.exists(app_path):
+        return send_file(app_path, mimetype='text/html')
+    return "<h2>app.html não encontrado. Faça upload do arquivo app.html no repositório.</h2>", 404
+
 @app.route('/temp/<token>', methods=['GET'])
 def serve_temp(token):
     """Serve arquivo temporário para o Bunny Fetch baixar."""
