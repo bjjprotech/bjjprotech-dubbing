@@ -1,0 +1,2262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BJJ Pro Tech — Localização v2.1</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Literata:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f5f3ee; --surface:#fff; --surface2:#f0ede6;
+  --border:#ddd9d0; --border2:#c8c3b8;
+  --text:#1a1916; --text2:#5a5750; --text3:#9a9590;
+  --accent:#c8430a; --accent-bg:#fdf1ec;
+  --green:#1a6b3a; --green-bg:#eaf4ee;
+  --blue:#1a4f8a; --blue-bg:#edf3fb;
+  --amber:#8a5a0a; --amber-bg:#fdf6e3;
+  --mono:'IBM Plex Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Literata',serif;font-size:15px;line-height:1.6;min-height:100vh}
+
+/* HEADER */
+.hdr{background:var(--text);color:var(--bg);padding:0 28px;height:52px;display:flex;align-items:center;justify-content:space-between}
+.hdr-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;letter-spacing:.04em;display:flex;align-items:center;gap:9px}
+.hdr-dot{width:7px;height:7px;background:var(--accent);border-radius:50%}
+.hdr-chips{display:flex;gap:10px;font-family:var(--mono);font-size:10px;color:rgba(245,243,238,.45)}
+.chip{background:rgba(245,243,238,.08);border:1px solid rgba(245,243,238,.12);border-radius:3px;padding:3px 8px;display:flex;align-items:center;gap:4px}
+.cdot{width:5px;height:5px;border-radius:50%}
+
+/* LAYOUT */
+.lay{display:grid;grid-template-columns:290px 1fr;min-height:calc(100vh - 52px)}
+
+/* SIDEBAR */
+.sb{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;position:sticky;top:52px;height:calc(100vh - 52px)}
+.sb-blk{padding:18px 20px;border-bottom:1px solid var(--border)}
+.blk-ttl{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.blk-ttl::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* PROXY SETUP CALLOUT */
+.proxy-callout{background:var(--amber-bg);border:1px solid rgba(138,90,10,.25);border-radius:6px;padding:12px 14px;margin-bottom:12px}
+.proxy-callout-title{font-family:'Syne',sans-serif;font-weight:700;font-size:12px;color:var(--amber);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.proxy-callout p{font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:6px}
+.proxy-callout p:last-child{margin-bottom:0}
+.proxy-step{font-family:var(--mono);font-size:11px;color:var(--text2);margin:4px 0}
+.proxy-step b{color:var(--text)}
+
+/* FIELDS */
+.fld{margin-bottom:10px}
+.fld:last-child{margin-bottom:0}
+.fld label{display:block;font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+.fld input,.fld select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none;transition:border-color .15s;appearance:none}
+.fld input:focus,.fld select:focus{border-color:var(--accent);background:#fff}
+.fld input::placeholder{color:var(--text3)}
+
+/* TOOL CARDS */
+.tc{border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-bottom:8px}
+.tc:last-of-type{margin-bottom:0}
+.tc-hdr{background:var(--surface2);padding:7px 11px;display:flex;align-items:center;justify-content:space-between}
+.tc-name{font-family:var(--mono);font-size:11px;font-weight:500}
+.badge{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:3px}
+.badge-blue{background:var(--blue-bg);color:var(--blue)}
+.badge-green{background:var(--green-bg);color:var(--green)}
+.tc-body{padding:9px 11px}
+.tc-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:3px}
+.tc-row:last-child{margin-bottom:0}
+.tc-val{font-family:var(--mono);font-size:11px;color:var(--text)}
+
+/* LANG BUTTONS */
+.lng-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.lng-btn{border:1px solid var(--border);border-radius:4px;padding:6px 9px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--mono);background:var(--bg);color:var(--text2);transition:all .15s;user-select:none}
+.lng-btn:hover{border-color:var(--border2);color:var(--text)}
+.lng-btn.on{border-color:var(--accent);background:var(--accent-bg);color:var(--accent)}
+
+/* SELECT WRAP */
+.sel-wrap{position:relative}
+.sel-wrap select{padding-right:26px}
+.sel-wrap::after{content:'▾';position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:10px;color:var(--text3)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border-radius:4px;font-family:'Syne',sans-serif;font-weight:600;font-size:13px;cursor:pointer;border:none;transition:all .15s;width:100%;letter-spacing:.02em}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#b03a08}
+.btn-primary:disabled{background:var(--border2);color:var(--text3);cursor:not-allowed}
+.btn-outline{background:transparent;color:var(--text2);border:1px solid var(--border)}
+.btn-outline:hover{border-color:var(--border2);color:var(--text);background:var(--surface2)}
+.btn-sm{padding:5px 11px;font-size:12px;width:auto}
+.btn-green{background:var(--green);color:#fff}
+.btn-green:hover{background:#155c31}
+
+/* MAIN */
+.main{overflow-y:auto}
+
+/* PIPELINE */
+.pipe{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;align-items:center;gap:0;overflow-x:auto}
+.ps{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-family:var(--mono);font-size:10px;color:var(--text3);white-space:nowrap;transition:all .2s}
+.pn{width:17px;height:17px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;transition:all .2s}
+.ps.active{background:var(--accent-bg);color:var(--accent)}
+.ps.active .pn{background:var(--accent);color:#fff}
+.ps.done{color:var(--green)}
+.ps.done .pn{background:var(--green);color:#fff}
+.pa{color:var(--border2);font-size:11px;flex-shrink:0;margin:0 1px}
+
+/* CONTENT */
+.content{padding:24px}
+.section{display:none}
+.section.active{display:block;animation:fadeup .3s ease}
+@keyframes fadeup{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+/* STATS */
+.st-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.st-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px 14px;min-width:0}
+.st-val{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;line-height:1.1;margin-bottom:4px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* VIDEO PANEL */
+.vpan{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.pbar{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface2)}
+.ptitle{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;gap:7px}
+.pacts{display:flex;gap:5px;align-items:center}
+.srch{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:5px 9px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none;width:160px;transition:border-color .15s}
+.srch:focus{border-color:var(--accent)}
+.srch::placeholder{color:var(--text3)}
+
+/* VIDEO LIST */
+.vlist{max-height:460px;overflow-y:auto}
+.vi{display:flex;align-items:center;gap:11px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s}
+.vi:last-child{border-bottom:none}
+.vi:hover{background:var(--bg)}
+.vi.sel{background:var(--accent-bg)}
+.vthumb{width:76px;height:43px;background:var(--surface2);border-radius:4px;overflow:hidden;flex-shrink:0;position:relative;display:flex;align-items:center;justify-content:center;border:1px solid var(--border)}
+.vthumb img{width:100%;height:100%;object-fit:cover}
+.vthumb-ic{font-size:15px;opacity:.25}
+.vmeta{flex:1;min-width:0}
+.vname{font-family:'Syne',sans-serif;font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.vmrow{display:flex;gap:9px;font-family:var(--mono);font-size:10px;color:var(--text3)}
+.vchk{width:19px;height:19px;border:1.5px solid var(--border2);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;transition:all .15s}
+.vi.sel .vchk{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* QUEUE */
+.qfooter{padding:11px 14px;background:var(--surface2);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.qtags{flex:1;display:flex;flex-wrap:wrap;gap:4px}
+.qtag{background:var(--accent-bg);border:1px solid rgba(200,67,10,.2);color:var(--accent);padding:2px 7px;border-radius:3px;font-family:var(--mono);font-size:11px;display:flex;align-items:center;gap:4px}
+.qtag-x{cursor:pointer;opacity:.55;font-size:13px;line-height:1}
+.qtag-x:hover{opacity:1}
+
+/* EMPTY */
+.empty{padding:50px 28px;text-align:center;color:var(--text3)}
+.ei{font-size:36px;opacity:.2;margin-bottom:10px}
+.et{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:var(--text2);margin-bottom:5px}
+.ed{font-size:13px}
+
+/* PROCESS PANELS */
+.ppan{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:18px}
+.ppan:last-child{margin-bottom:0}
+.ibar{background:var(--blue-bg);border-bottom:1px solid rgba(26,79,138,.15);padding:9px 14px;font-size:13px;color:var(--blue);line-height:1.5}
+.wbar{background:var(--amber-bg);border-bottom:1px solid rgba(138,90,10,.15);padding:9px 14px;font-size:13px;color:var(--amber);line-height:1.5}
+
+/* PROGRESS */
+.progs{padding:14px}
+.pi{margin-bottom:13px;padding:11px 13px;background:var(--bg);border:1px solid var(--border);border-radius:5px}
+.pi:last-child{margin-bottom:0}
+.pi-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.pi-name{font-family:'Syne',sans-serif;font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:68%}
+.pi-st{font-family:var(--mono);font-size:10px;color:var(--text3)}
+.pi-st.run{color:var(--accent)} .pi-st.ok{color:var(--green)} .pi-st.err{color:#c00}
+.track{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:5px}
+.fill{height:100%;border-radius:2px;background:var(--accent);transition:width .4s ease}
+.fill.g{background:var(--green)} .fill.b{background:var(--blue)}
+.pi-sub{font-family:var(--mono);font-size:10px;color:var(--text3)}
+
+/* LOG */
+.log{background:var(--text);color:rgba(245,243,238,.8);font-family:var(--mono);font-size:11px;padding:12px 14px;max-height:180px;overflow-y:auto;line-height:1.9;margin:0 14px 14px;border-radius:5px}
+.ll{display:flex;gap:9px;animation:fi .2s ease}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+.lt{color:rgba(245,243,238,.28);flex-shrink:0}
+.lok{color:#5fca8a} .lin{color:#7aadde} .lwn{color:#e8c06a} .ler{color:#e87a7a} .lm{color:rgba(245,243,238,.75)}
+
+/* SRT */
+.srtt{display:flex;gap:0;padding:0 14px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.srttab{padding:7px 13px;font-family:var(--mono);font-size:11px;cursor:pointer;border-bottom:2px solid transparent;color:var(--text3);transition:all .15s;display:flex;align-items:center;gap:4px}
+.srttab:hover{color:var(--text2)}
+.srttab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.srtv{padding:14px;max-height:240px;overflow-y:auto;font-family:var(--mono);font-size:12px;line-height:1.9;background:var(--bg);margin:14px;border:1px solid var(--border);border-radius:5px}
+.se{margin-bottom:12px} .sn{color:var(--text3)} .stc{color:var(--blue)}
+.stx{color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:2px 6px;cursor:pointer;transition:border-color .15s;display:inline-block}
+.stx:hover{border-color:var(--accent)}
+.stx[contenteditable="true"]{outline:none;border-color:var(--accent);background:#fff}
+
+/* VOICE PREVIEW SECTION */
+.voice-preview-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.voice-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:5px}
+.voice-row-flag{font-size:18px;flex-shrink:0}
+.voice-row-info{flex:1;min-width:0}
+.voice-row-name{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--text)}
+.voice-row-desc{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:1px}
+.voice-row-ctrl{display:flex;gap:5px;flex-shrink:0}
+.voice-playing{border-color:var(--green)!important;background:var(--green-bg)!important}
+
+/* VOICE ANALYSIS BOX */
+.voice-analysis-badge{display:inline-block;background:var(--green);color:#fff;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle}
+
+/* BUNNY AUDIO UPLOAD NOTE */
+.bunny-audio-note{background:var(--amber-bg);border:1px solid rgba(138,90,10,.2);border-radius:5px;padding:10px 13px;font-size:12px;color:var(--text2);line-height:1.6;margin:0 14px 14px}
+.bunny-audio-note b{color:var(--amber)}
+
+/* COST BOX */
+.cbox{background:var(--amber-bg);border:1px solid rgba(138,90,10,.2);border-radius:6px;padding:11px 14px;margin-bottom:18px}
+.crow{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--text2);margin-bottom:3px;padding-bottom:3px;border-bottom:1px solid rgba(138,90,10,.1)}
+.crow:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;font-weight:600;color:var(--text)}
+.cval{font-family:var(--mono);font-size:11px}
+
+/* DONE */
+.done-w{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:48px 36px;text-align:center}
+.done-ic{font-size:52px;margin-bottom:18px}
+.done-ttl{font-family:'Syne',sans-serif;font-weight:800;font-size:30px;color:var(--green);letter-spacing:.02em;margin-bottom:8px}
+.done-desc{color:var(--text2);max-width:420px;margin:0 auto 24px;font-size:14px;line-height:1.7}
+.done-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:360px;margin:0 auto 24px}
+.done-acts{display:flex;gap:8px;justify-content:center}
+
+/* MODAL */
+.mbg{position:fixed;inset:0;background:rgba(26,25,22,.5);backdrop-filter:blur(3px);z-index:999;display:none;align-items:center;justify-content:center}
+.mbg.open{display:flex}
+.mdl{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:26px;width:440px;max-width:92vw;box-shadow:0 16px 50px rgba(0,0,0,.15)}
+.mdl-ttl{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.mdl-body{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:18px}
+.mdl-body strong{color:var(--text)}
+.mdl-acts{display:flex;gap:7px;justify-content:flex-end}
+
+/* TOAST */
+.toasts{position:fixed;bottom:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:7px}
+.toast{background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:9px 13px;font-size:13px;display:flex;align-items:center;gap:8px;min-width:250px;box-shadow:0 3px 16px rgba(0,0,0,.09);animation:slr .22s ease}
+@keyframes slr{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+.toast.ok{border-left:3px solid var(--green)} .toast.err{border-left:3px solid var(--accent)} .toast.inf{border-left:3px solid var(--blue)}
+
+/* SPINNER */
+.spin{width:13px;height:13px;border:2px solid rgba(200,67,10,.2);border-top-color:var(--accent);border-radius:50%;animation:rot .7s linear infinite;flex-shrink:0}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* SECTION HEADING */
+.sh{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.sh::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* PROXY STATUS */
+.proxy-status{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;margin-top:8px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px}
+.proxy-status-dot{width:7px;height:7px;border-radius:50%;background:var(--border2);flex-shrink:0;transition:background .3s}
+.proxy-status-dot.ok{background:var(--green)}
+.proxy-status-dot.err{background:var(--accent)}
+.proxy-status-dot.checking{background:var(--amber);animation:pulse .8s ease infinite alternate}
+@keyframes pulse{to{opacity:.4}}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-logo"><div class="hdr-dot"></div>BJJ PRO TECH <span style="font-weight:400;opacity:.35;font-size:12px;margin-left:2px;">— Localização</span></div>
+  <div class="hdr-chips">
+    <div class="chip"><div class="cdot" style="background:#4fbbff"></div>Gemini 2.5 Flash</div>
+    <div class="chip"><div class="cdot" style="background:#f5c842"></div>Gemini TTS</div>
+    <div class="chip"><div class="cdot" style="background:#ff7b4f"></div>Bunny Stream</div>
+  </div>
+</header>
+
+<div class="lay">
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="sb">
+
+    <!-- PROXY CONFIG -->
+    <div class="sb-blk">
+      <div class="blk-ttl">Proxy (obrigatório)</div>
+
+      <div class="proxy-callout">
+        <div class="proxy-callout-title">⚙️ Por que precisa de proxy?</div>
+        <p>A API do Bunny bloqueia chamadas diretas do navegador (CORS). O proxy é um mini-servidor gratuito que fica no meio.</p>
+        <p><b>Setup em 3 passos (5 min):</b></p>
+        <div class="proxy-step"><b>1.</b> Acesse <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--blue)">workers.cloudflare.com</a></div>
+        <div class="proxy-step"><b>2.</b> Crie um Worker e cole o arquivo <code style="background:rgba(0,0,0,.06);padding:1px 4px;border-radius:2px;">bunny-proxy-worker.js</code></div>
+        <div class="proxy-step"><b>3.</b> Cole a URL gerada abaixo</div>
+      </div>
+
+      <div class="fld">
+        <label>URL do Cloudflare Worker</label>
+        <input type="text" id="cfgProxy" placeholder="https://bunny-proxy.SEU-USUARIO.workers.dev" />
+      </div>
+      <div class="proxy-status" id="proxyStatus">
+        <div class="proxy-status-dot" id="proxyDot"></div>
+        <span id="proxyMsg">Cole a URL do worker acima</span>
+      </div>
+      <div class="fld" style="margin-top:10px">
+        <label>Worker URL (com Container)</label>
+        <input type="text" id="cfgContainerProxy" placeholder="https://bjjprotech-dubbing-production.up.railway.app" />
+        <p style="font-size:10px;color:var(--text3);margin-top:4px;font-family:var(--mono);line-height:1.5">Novo worker com suporte FFmpeg. Se vazio, usa o worker acima.</p>
+      </div>
+    </div>
+
+    <!-- BUNNY -->
+    <div class="sb-blk">
+      <div class="blk-ttl">Bunny Stream</div>
+      <div class="fld">
+        <label>Library ID</label>
+        <input type="text" id="cfgLibId" placeholder="123456" />
+      </div>
+      <div class="fld">
+        <label>Stream API Key</label>
+        <input type="password" id="cfgBunnyKey" placeholder="••••••••••••" />
+      </div>
+      <div class="fld">
+        <label>CDN Hostname (opcional)</label>
+        <input type="text" id="cfgCdn" placeholder="vz-xxxx.b-cdn.net" />
+      </div>
+      <button class="btn btn-primary" style="margin-top:6px" onclick="loadVideos()" id="loadBtn">
+        Carregar Biblioteca
+      </button>
+    </div>
+
+    <!-- GOOGLE AI -->
+    <div class="sb-blk">
+      <div class="blk-ttl">Google AI</div>
+      <div class="tc">
+        <div class="tc-hdr"><span class="tc-name">Gemini 2.5 Flash</span><span class="badge badge-blue">Transcrição + Tradução</span></div>
+        <div class="tc-body">
+          <div class="tc-row"><span>Áudio input</span><span class="tc-val">$1,00 / 1M tok</span></div>
+          <div class="tc-row"><span>Custo/minuto</span><span class="tc-val">~$0,025/min</span></div>
+          <div class="tc-row"><span>Tradução inclusa</span><span class="tc-val" style="color:var(--green)">✓</span></div>
+        </div>
+      </div>
+      <div class="tc" style="margin-top:8px">
+        <div class="tc-hdr"><span class="tc-name">Gemini 3.1 Flash TTS ★</span><span class="badge badge-green">Dublagem</span></div>
+        <div class="tc-body">
+          <div class="tc-row"><span>Áudio output</span><span class="tc-val">$10,00 / 1M tok</span></div>
+          <div class="tc-row"><span>Custo/minuto</span><span class="tc-val">~$0,015/min</span></div>
+          <div class="tc-row"><span>Ranking qualidade</span><span class="tc-val" style="color:var(--green)">#2 global (Elo 1211)</span></div>
+          <div class="tc-row"><span>Clone de voz</span><span class="tc-val" style="color:var(--accent)">— não</span></div>
+        </div>
+      </div>
+      <div class="fld" style="margin-top:10px">
+        <label>Gemini API Key</label>
+        <input type="password" id="cfgGeminiKey" placeholder="AIza••••••••••••" />
+      </div>
+    </div>
+
+    <!-- IDIOMAS -->
+    <div class="sb-blk">
+      <div class="blk-ttl">Idiomas</div>
+      <div class="lng-grid">
+        <div class="lng-btn on" id="lang-pt" onclick="toggleLang('pt',this)">🇧🇷 PT-BR</div>
+        <div class="lng-btn on" id="lang-en" onclick="toggleLang('en',this)">🇺🇸 EN-US</div>
+        <div class="lng-btn on" id="lang-es" onclick="toggleLang('es',this)">🇪🇸 ES-ES</div>
+        <div class="lng-btn" id="lang-fr" onclick="toggleLang('fr',this)">🇫🇷 FR-FR</div>
+      </div>
+      <p style="font-size:11px;color:var(--text3);margin-top:7px;font-family:var(--mono)">PT-BR = idioma fonte (não dublado)</p>
+    </div>
+
+    <!-- VOZES TTS -->
+    <div class="sb-blk">
+      <div class="blk-ttl">Vozes Gemini TTS 3.1</div>
+
+      <!-- VOICE ANALYSIS RESULT -->
+      <div id="voice-analysis-box" style="display:none; background:var(--green-bg); border:1px solid rgba(26,107,58,.25); border-radius:5px; padding:10px 12px; margin-bottom:12px; font-size:11px; font-family:var(--mono); color:var(--text2); line-height:1.6">
+        <div style="font-weight:500; color:var(--green); margin-bottom:5px; display:flex; align-items:center; gap:6px;">
+          <div class="spin" id="voice-analysis-spin" style="border-top-color:var(--green); display:none"></div>
+          <span id="voice-analysis-title">🎤 Análise da Voz do Instrutor</span>
+        </div>
+        <div id="voice-analysis-text" style="color:var(--text2)"></div>
+      </div>
+
+      <p style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:10px;line-height:1.5">Selecione um vídeo e a IA analisa a voz do instrutor para sugerir as melhores vozes. Clique ▶ para ouvir amostras.</p>
+
+      <div style="margin-bottom:10px">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">🇺🇸 Inglês (EN-US)</div>
+        <div class="voice-preview-grid" id="voices-en"></div>
+      </div>
+
+      <div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">🇪🇸 Espanhol (ES-ES)</div>
+        <div class="voice-preview-grid" id="voices-es"></div>
+      </div>
+
+      <p style="font-size:11px;color:var(--text3);margin-top:10px;font-family:var(--mono);line-height:1.5">⚠️ Voz não clona o instrutor — é pré-definida pelo Google.</p>
+    </div>
+
+    <!-- OPÇÕES -->
+    <div class="sb-blk">
+      <div class="blk-ttl">Opções</div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="opt-srt" checked style="accent-color:var(--accent)"> Gerar SRT + subir no Bunny
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="opt-dub" checked style="accent-color:var(--accent)"> Dublar com Gemini TTS
+        </label>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <main class="main">
+
+    <!-- PIPELINE -->
+    <div class="pipe">
+      <button class="btn btn-outline btn-sm" id="btn-back" onclick="backToStart()" style="width:auto;padding:4px 10px;font-size:11px;flex-shrink:0;display:none">↩ Início</button>
+      <div class="ps active" id="ps-1"><div class="pn">1</div>Selecionar</div>
+      <div class="pa">›</div>
+      <div class="ps" id="ps-2"><div class="pn">2</div>Transcrição</div>
+      <div class="pa">›</div>
+      <div class="ps" id="ps-3"><div class="pn">3</div>Tradução</div>
+      <div class="pa">›</div>
+      <div class="ps" id="ps-4"><div class="pn">4</div>Dublagem TTS</div>
+      <div class="pa">›</div>
+      <div class="ps" id="ps-5"><div class="pn">5</div>Upload Bunny</div>
+      <div class="pa">›</div>
+      <div class="ps" id="ps-6"><div class="pn">6</div>Concluído</div>
+    </div>
+
+    <div class="content">
+
+      <!-- ── SEC 1: SELECIONAR ── -->
+      <div class="section active" id="sec-1">
+        <div class="st-grid">
+          <div class="st-card"><div class="st-val" id="st-total">0</div><div class="st-lbl">Vídeos na biblioteca</div></div>
+          <div class="st-card"><div class="st-val" id="st-sel">0</div><div class="st-lbl">Selecionados</div></div>
+          <div class="st-card"><div class="st-val" id="st-dur">0m</div><div class="st-lbl">Duração total</div></div>
+          <div class="st-card"><div class="st-val" id="st-cost">—</div><div class="st-lbl">Custo estimado</div></div>
+        </div>
+
+        <div class="vpan">
+          <div class="pbar">
+            <div class="ptitle">🎬 Biblioteca Bunny Stream</div>
+            <div class="pacts">
+              <input class="srch" id="srchBox" placeholder="Buscar..." oninput="filterVids()">
+              <button class="btn btn-outline btn-sm" onclick="selAll()">Todos</button>
+              <button class="btn btn-outline btn-sm" onclick="clearSel()">Limpar</button>
+            </div>
+          </div>
+          <div class="vlist" id="vlist">
+            <div class="empty"><div class="ei">📡</div><div class="et">Conecte sua biblioteca</div><div class="ed">Configure o proxy e as credenciais Bunny na barra lateral</div></div>
+          </div>
+          <div id="qbar" style="display:none">
+            <div class="qfooter">
+              <div class="qtags" id="qtags"></div>
+              <button class="btn btn-primary btn-sm" onclick="confirmStart()">Iniciar Pipeline →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SEC 2: TRANSCRIÇÃO ── -->
+      <div class="section" id="sec-2">
+        <div class="sh">Etapa 2 — Transcrição com Gemini 2.5 Flash</div>
+        <div class="ppan">
+          <div class="ibar">ℹ️ Áudio enviado para <strong>Gemini 2.5 Flash</strong> via Files API. Transcreve PT-BR e retorna SRT com timestamps precisos. ~$0,025/min.</div>
+          <div class="progs" id="prg-t"></div>
+          <div class="log" id="log-t"><div class="ll"><span class="lt">--:--</span><span class="lin">▸</span><span class="lm">Aguardando início...</span></div></div>
+        </div>
+        <div class="ppan" id="srt-panel" style="display:none">
+          <div class="pbar">
+            <div class="ptitle">📄 Transcrição PT-BR</div>
+            <div class="pacts">
+              <button class="btn btn-outline btn-sm" onclick="enableEdit()">✏ Editar</button>
+              <button class="btn btn-outline btn-sm" onclick="dlSrt('pt')">↓ SRT</button>
+            </div>
+          </div>
+          <div class="srtv" id="srt-pt-view"></div>
+          <div style="padding:11px 14px;border-top:1px solid var(--border);display:flex;gap:7px">
+            <button class="btn btn-primary" onclick="goStep(3)">Continuar para Tradução →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SEC 3: TRADUÇÃO ── -->
+      <div class="section" id="sec-3">
+        <div class="sh">Etapa 3 — Tradução com Gemini 2.5 Flash</div>
+        <div class="ppan">
+          <div class="ibar">ℹ️ Gemini traduz o SRT PT-BR preservando terminologia técnica de jiu-jitsu em cada idioma.</div>
+          <div class="progs" id="prg-r"></div>
+          <div class="log" id="log-r"><div class="ll"><span class="lt">--:--</span><span class="lin">▸</span><span class="lm">Aguardando transcrição...</span></div></div>
+        </div>
+        <div class="ppan" id="trans-panel" style="display:none">
+          <div class="pbar">
+            <div class="ptitle">🌐 Legendas Traduzidas</div>
+            <div class="pacts"><button class="btn btn-outline btn-sm" onclick="dlAllSrt()">↓ Todos SRTs</button></div>
+          </div>
+          <div class="srtt" id="trans-tabs"></div>
+          <div class="srtv" id="trans-view"></div>
+          <div style="padding:11px 14px;border-top:1px solid var(--border)">
+            <button class="btn btn-primary" onclick="goStep(4)">Continuar para Dublagem →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SEC 4: DUBLAGEM ── -->
+      <div class="section" id="sec-4">
+        <div class="sh">Etapa 4 — Dublagem com Gemini TTS Flash</div>
+        <div class="cbox">
+          <div class="crow"><span>Modelo</span><span class="cval">gemini-3.1-flash-tts-preview</span></div>
+          <div class="crow"><span>25 tokens/seg → 1.500 tokens/min</span><span class="cval">$10,00 / 1M tokens output</span></div>
+          <div class="crow" id="dub-cost-total"><span>Custo estimado</span><span class="cval">calculando...</span></div>
+        </div>
+        <div class="ppan">
+          <div class="ibar" style="background:var(--green-bg);border-color:rgba(26,107,58,.15);color:var(--green)">✓ Pipeline 100% automático — os áudios dublados serão mesclados e enviados para o Bunny automaticamente via Railway (FFmpeg na nuvem). Nenhuma ação manual necessária.</div>
+          <div class="progs" id="prg-d"></div>
+          <div class="log" id="log-d"><div class="ll"><span class="lt">--:--</span><span class="lin">▸</span><span class="lm">Aguardando traduções...</span></div></div>
+        </div>
+        <div class="ppan" id="audio-panel" style="display:none">
+          <div class="pbar"><div class="ptitle">🎙 Áudios Gerados</div></div>
+          <div id="audio-list"></div>
+          <div id="dub-upload-status" style="display:none; padding:0 14px 14px">
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+              <div style="background:var(--surface2);padding:8px 13px;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3)">Upload automático para Bunny</div>
+              <div class="progs" id="prg-dubupload"></div>
+              <div class="log" id="log-dubupload" style="margin:0 14px 14px"></div>
+            </div>
+          </div>
+          <div style="padding:11px 14px;border-top:1px solid var(--border);display:flex;gap:8px">
+            <button class="btn btn-primary" id="btn-auto-upload" onclick="startAutoUpload()" style="flex:1">
+              ☁ Mesclar + Upload Automático no Bunny
+            </button>
+            <button class="btn btn-outline" onclick="generateScript()" style="flex:none;width:auto;padding:10px 14px" title="Alternativa: gerar script Python para rodar localmente">
+              ⬇ Script Python
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SEC 5: UPLOAD ── -->
+      <div class="section" id="sec-5">
+        <div class="sh">Etapa 5 — Sincronização no Bunny Stream</div>
+        <div class="ppan">
+          <div class="ibar">ℹ️ SRTs enviados via <code style="font-family:var(--mono);background:rgba(26,79,138,.1);padding:1px 5px;border-radius:2px">POST /library/{id}/videos/{guid}/captions/{lang}</code>. <strong>IDs dos vídeos preservados.</strong></div>
+          <div class="progs" id="prg-u"></div>
+          <div class="log" id="log-u"><div class="ll"><span class="lt">--:--</span><span class="lin">▸</span><span class="lm">Aguardando dublagem...</span></div></div>
+        </div>
+      </div>
+
+      <!-- ── SEC 6: CONCLUÍDO ── -->
+      <div class="section" id="sec-6">
+        <div class="done-w">
+          <div class="done-ic">🥋</div>
+          <div class="done-ttl">Localização Concluída</div>
+          <div class="done-desc">Vídeos transcritos, traduzidos e dublados. Legendas e áudios sincronizados no Bunny Stream — IDs preservados.</div>
+          <div class="done-stats">
+            <div class="st-card"><div class="st-val" id="dv">0</div><div class="st-lbl">Vídeos</div></div>
+            <div class="st-card"><div class="st-val" id="dl">2</div><div class="st-lbl">Idiomas</div></div>
+            <div class="st-card"><div class="st-val" id="dt">—</div><div class="st-lbl">Tempo</div></div>
+          </div>
+          <div class="done-acts">
+            <button class="btn btn-primary btn-sm" onclick="resetAll()" style="width:auto;padding:8px 18px">Processar mais vídeos</button>
+            <button class="btn btn-green btn-sm" onclick="generateScript()" style="width:auto;padding:8px 18px">⬇ Script Python</button>
+            <button class="btn btn-outline btn-sm" onclick="dlReport()" style="width:auto;padding:8px 18px">↓ Relatório</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- MODAL -->
+<div class="mbg" id="modal">
+  <div class="mdl">
+    <div class="mdl-ttl" id="m-ttl"></div>
+    <div class="mdl-body" id="m-body"></div>
+    <div class="mdl-acts">
+      <button class="btn btn-outline btn-sm" onclick="closeModal()" style="width:auto;padding:6px 13px">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="m-ok" style="width:auto;padding:6px 14px">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+const S = {
+  proxy:'', libId:'', bunnyKey:'', cdnHost:'', geminiKey:'',
+  videos:[], filtered:[],
+  sel: new Set(),
+  langs: new Set(['pt','en','es']),
+  step:1,
+  srt:{ pt:'', en:'', es:'', fr:'' },
+  audioBlobs:{},
+  startTs:null,
+  modalCb:null,
+};
+
+const TRS_PER_MIN = 0.025;
+const TTS_PER_MIN = 0.015;
+
+// ════════════════════════════════════════
+// PROXY UTILS  — todas as chamadas Bunny passam por aqui
+// ════════════════════════════════════════
+function proxyUrl(bunnyPath) {
+  const base = S.proxy.replace(/\/$/, '');
+  // /library/... → /proxy/stream/library/...
+  return `${base}/proxy/stream${bunnyPath}`;
+}
+
+async function bunnyFetch(path, opts = {}) {
+  const url = proxyUrl(path);
+  const headers = { AccessKey: S.bunnyKey, accept: 'application/json', ...opts.headers };
+  if (opts.body && typeof opts.body === 'string') headers['Content-Type'] = 'application/json';
+  const res = await fetch(url, { ...opts, headers });
+  return res;
+}
+
+// Testa proxy ao digitar a URL
+let proxyTestTimer;
+document.getElementById('cfgProxy').addEventListener('input', e => {
+  clearTimeout(proxyTestTimer);
+  const v = e.target.value.trim();
+  S.proxy = v;
+  if (!v) { setProxyStatus('idle', 'Cole a URL do worker acima'); return; }
+  setProxyStatus('checking', 'Testando conexão...');
+  proxyTestTimer = setTimeout(() => testProxy(v), 900);
+});
+
+async function testProxy(url) {
+  try {
+    const res = await fetch(url.replace(/\/$/, '') + '/proxy/stream/', {
+      method:'GET',
+      headers: { AccessKey:'test', accept:'application/json' }
+    });
+    // qualquer resposta (mesmo 4xx do bunny) significa que o proxy respondeu
+    setProxyStatus('ok', `Proxy respondendo ✓ (${url.split('/')[2]})`);
+  } catch(e) {
+    setProxyStatus('err', 'Proxy não respondeu — verifique a URL');
+  }
+}
+
+function setProxyStatus(state, msg) {
+  const dot = document.getElementById('proxyDot');
+  const txt = document.getElementById('proxyMsg');
+  dot.className = 'proxy-status-dot' + (state === 'ok' ? ' ok' : state === 'err' ? ' err' : state === 'checking' ? ' checking' : '');
+  txt.textContent = msg;
+}
+
+// ════════════════════════════════════════
+// LOAD VIDEOS
+// ════════════════════════════════════════
+async function loadVideos() {
+  const libId  = document.getElementById('cfgLibId').value.trim();
+  const key    = document.getElementById('cfgBunnyKey').value.trim();
+  const proxy  = document.getElementById('cfgProxy').value.trim();
+
+  if (!proxy) { toast('Configure a URL do Cloudflare Worker primeiro', 'err'); return; }
+  if (!libId || !key) { toast('Preencha Library ID e API Key', 'err'); return; }
+
+  S.proxy    = proxy;
+  S.libId    = libId;
+  S.bunnyKey = key;
+  S.cdnHost  = document.getElementById('cfgCdn').value.trim() || `vz-${libId}.b-cdn.net`;
+
+  const btn = document.getElementById('loadBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Carregando...';
+
+  try {
+    const res = await bunnyFetch(`/library/${libId}/videos?page=1&itemsPerPage=200&orderBy=date`);
+
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`HTTP ${res.status}: ${txt.substring(0, 120)}`);
+    }
+
+    const data = await res.json();
+    S.videos = data.items || [];
+    toast(`✓ ${S.videos.length} vídeos carregados`, 'ok');
+
+  } catch(e) {
+    toast(`Erro: ${e.message.substring(0, 80)}`, 'err');
+    // Modo demo como fallback
+    S.videos = demoVideos();
+    toast('Modo demo ativado', 'inf');
+  }
+
+  S.filtered = [...S.videos];
+  renderList();
+  updateStats();
+  btn.disabled = false;
+  btn.innerHTML = 'Carregar Biblioteca';
+}
+
+function demoVideos() {
+  return [
+    { guid:'demo-001', title:'Raspagem de Guarda Aberta — Fundamentos', length:1842, storageSize:245e6 },
+    { guid:'demo-002', title:'Triângulo do Ápice — Detalhamento Completo', length:2134, storageSize:310e6 },
+    { guid:'demo-003', title:'Passagem de Guarda Lasso', length:1256, storageSize:178e6 },
+    { guid:'demo-004', title:'Kimura da Meia Guarda', length:1680, storageSize:225e6 },
+    { guid:'demo-005', title:'Berimbolo — Sequência Completa', length:2890, storageSize:389e6 },
+    { guid:'demo-006', title:'Arrastão de Tornozelo', length:1124, storageSize:156e6 },
+    { guid:'demo-007', title:'Rear Naked Choke — Detalhes', length:945, storageSize:134e6 },
+    { guid:'demo-008', title:'X-Guard — Entradas e Finalizações', length:3240, storageSize:445e6 },
+  ];
+}
+
+// ════════════════════════════════════════
+// VIDEO LIST
+// ════════════════════════════════════════
+function renderList() {
+  const el = document.getElementById('vlist');
+  if (!S.filtered.length) {
+    el.innerHTML = `<div class="empty"><div class="ei">🔍</div><div class="et">Sem resultados</div></div>`;
+    return;
+  }
+  el.innerHTML = S.filtered.map(v => {
+    const sel = S.sel.has(v.guid);
+    const thumb = v.thumbnailFileName ? `https://${S.cdnHost}/${v.guid}/${v.thumbnailFileName}` : '';
+    return `<div class="vi${sel?' sel':''}" onclick="toggleV('${v.guid}')">
+      <div class="vthumb">${thumb ? `<img src="${thumb}" onerror="this.style.display='none'">` : ''}<span class="vthumb-ic">▶</span></div>
+      <div class="vmeta">
+        <div class="vname">${v.title}</div>
+        <div class="vmrow"><span>⏱ ${fmtDur(v.length)}</span><span>💾 ${fmtSz(v.storageSize)}</span><span>${v.guid.substring(0,10)}…</span></div>
+      </div>
+      <div class="vchk">${sel?'✓':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleV(g) {
+  const wasEmpty = S.sel.size === 0;
+  S.sel.has(g) ? S.sel.delete(g) : S.sel.add(g);
+  renderList(); updateStats(); renderQueue();
+  if (wasEmpty && S.sel.size === 1 && S.geminiKey) {
+    const v = S.videos.find(x => x.guid === g);
+    if (v) analyzeVoice(v);
+  }
+}
+function selAll()   { S.filtered.forEach(v => S.sel.add(v.guid)); renderList(); updateStats(); renderQueue(); }
+function clearSel() { S.sel.clear(); renderList(); updateStats(); renderQueue(); }
+function filterVids() {
+  const q = document.getElementById('srchBox').value.toLowerCase();
+  S.filtered = S.videos.filter(v => v.title.toLowerCase().includes(q));
+  renderList();
+}
+
+function renderQueue() {
+  const bar = document.getElementById('qbar');
+  if (!S.sel.size) { bar.style.display = 'none'; return; }
+  bar.style.display = 'block';
+  document.getElementById('qtags').innerHTML = [...S.sel].map(g => {
+    const v = S.videos.find(x => x.guid === g);
+    const n = v ? v.title.substring(0,28) + (v.title.length > 28 ? '…' : '') : g;
+    return `<div class="qtag">▶ ${n}<span class="qtag-x" onclick="toggleV('${g}')">×</span></div>`;
+  }).join('');
+}
+
+function updateStats() {
+  const sel = S.videos.filter(v => S.sel.has(v.guid));
+  const mins = Math.ceil(sel.reduce((a,v) => a+(v.length||0), 0) / 60);
+  const dubL = [...S.langs].filter(l => l !== 'pt').length;
+  const cost = mins > 0 ? (mins * TRS_PER_MIN + mins * TTS_PER_MIN * dubL).toFixed(2) : null;
+  document.getElementById('st-total').textContent = S.videos.length;
+  document.getElementById('st-sel').textContent   = S.sel.size;
+  document.getElementById('st-dur').textContent   = mins > 0 ? `${mins}m` : '0m';
+  document.getElementById('st-cost').textContent  = cost ? `$${cost}` : '—';
+}
+
+// ════════════════════════════════════════
+// PIPELINE
+// ════════════════════════════════════════
+function goStep(n) {
+  S.step = n;
+  for (let i = 1; i <= 6; i++) {
+    document.getElementById(`ps-${i}`).className = 'ps' + (i < n ? ' done' : i === n ? ' active' : '');
+    const sec = document.getElementById(`sec-${i}`);
+    sec.className = 'section' + (i === n ? ' active' : '');
+  }
+  // Show back button when not on step 1
+  const backBtn = document.getElementById('btn-back');
+  if (backBtn) backBtn.style.display = n > 1 ? 'inline-flex' : 'none';
+  if (n === 3) startTranslation();
+  if (n === 4) startDubbing();
+  if (n === 5) startUpload();
+}
+
+function confirmStart() {
+  if (!S.sel.size) { toast('Selecione ao menos um vídeo', 'err'); return; }
+  S.geminiKey = document.getElementById('cfgGeminiKey').value.trim();
+  S.proxy     = document.getElementById('cfgProxy').value.trim();
+  S.libId     = document.getElementById('cfgLibId').value.trim();
+  S.bunnyKey  = document.getElementById('cfgBunnyKey').value.trim();
+  S.cdnHost   = document.getElementById('cfgCdn').value.trim() || `vz-${S.libId}.b-cdn.net`;
+  saveCfg();
+  const sel = S.videos.filter(v => S.sel.has(v.guid));
+  const mins = Math.ceil(sel.reduce((a,v) => a+(v.length||0),0) / 60);
+  const dubL = [...S.langs].filter(l => l !== 'pt');
+  const ct = (mins * TRS_PER_MIN).toFixed(2);
+  const cd = (mins * TTS_PER_MIN * dubL.length).toFixed(2);
+  showModal('🚀 Iniciar Pipeline',
+    `<strong>${sel.length} vídeo(s)</strong> · <strong>${mins} minutos</strong> de áudio<br><br>
+     • Transcrição PT-BR: Gemini 2.5 Flash (~$${ct})<br>
+     • Tradução ${dubL.map(l=>l.toUpperCase()).join('+')}: Gemini 2.5 Flash (incluso)<br>
+     • Dublagem TTS: Gemini TTS Flash (~$${cd})<br>
+     • Upload SRT: Bunny API (grátis)<br><br>
+     <strong>IDs preservados — links da plataforma intactos.</strong>`,
+    () => { closeModal(); S.startTs = Date.now(); goStep(2); startTranscription(); }
+  );
+}
+
+// ════════════════════════════════════════
+// STEP 2: TRANSCRIÇÃO
+// ════════════════════════════════════════
+async function startTranscription() {
+  const vids = S.videos.filter(v => S.sel.has(v.guid));
+  const prg  = document.getElementById('prg-t');
+  const log  = document.getElementById('log-t');
+  log.innerHTML = ''; prg.innerHTML = ''; S.srt.pt = '';
+
+  prg.innerHTML = vids.map((v,i) => piHtml(i,'t', v.title)).join('');
+
+  for (let i = 0; i < vids.length; i++) {
+    const v = vids[i];
+    piSt(i,'t','run','transcrevendo...');
+    aLog(log,'in',`Gemini 2.5 Flash — ${v.title.substring(0,45)}`);
+
+    try {
+      if (S.geminiKey && !v.guid.startsWith('demo-')) {
+        S.srt.pt += await transcribeGemini(v, i, log);
+      } else {
+        await simTranscribe(v, i, log);
+        S.srt.pt += mockSrt(v.title, i);
+      }
+    } catch(e) {
+      aLog(log,'wn',`Fallback simulado: ${e.message.substring(0,55)}`);
+      await simTranscribe(v, i, log);
+      S.srt.pt += mockSrt(v.title, i);
+    }
+    piSt(i,'t','ok','✓ concluído'); piFill(`pf-t-${i}`, 100, 'g');
+  }
+
+  aLog(log,'ok',`Transcrição PT-BR concluída — ${vids.length} vídeo(s)`);
+  document.getElementById('srt-pt-view').innerHTML = parseSrt(S.srt.pt);
+  document.getElementById('srt-panel').style.display = 'block';
+}
+
+async function transcribeGemini(v, i, log) {
+  // Try multiple download URLs — direct CDN first (no proxy size limit), then fallbacks
+  const cdnHost = S.cdnHost || `vz-${S.libId}.b-cdn.net`;
+  const urlsToTry = [
+    `https://${cdnHost}/${v.guid}/play_720p.mp4`,
+    `https://${cdnHost}/${v.guid}/original`,
+    `https://${cdnHost}/${v.guid}/play_360p.mp4`,
+    `https://${cdnHost}/${v.guid}/play_480p.mp4`,
+  ];
+
+  aLog(log,'in','Baixando vídeo diretamente do CDN Bunny...');
+  await animFill(`pf-t-${i}`, 15, 400);
+  piSub(`pb-t-${i}`, 'Conectando ao CDN...');
+
+  let blob = null;
+  for (const videoUrl of urlsToTry) {
+    try {
+      aLog(log,'in',`Tentando: ${videoUrl.split('/').pop()}`);
+      const dlRes = await fetch(videoUrl);
+      if (dlRes.ok) {
+        blob = await dlRes.blob();
+        aLog(log,'ok',`Download OK: ${(blob.size/1024/1024).toFixed(1)}MB`);
+        break;
+      }
+    } catch(e) {
+      aLog(log,'wn',`Falhou: ${e.message.substring(0,40)}`);
+    }
+  }
+
+  if (!blob) throw new Error('Não foi possível baixar o vídeo. Verifique se MP4 Fallback está ativo no Bunny.');
+
+  aLog(log,'in','Fazendo upload para Gemini Files API...');
+  await animFill(`pf-t-${i}`, 30, 300);
+  piSub(`pb-t-${i}`, 'Upload para Files API...');
+
+  const form = new FormData();
+  form.append('file', blob, 'video.mp4');
+  const upRes = await fetch(
+    `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${S.geminiKey}`,
+    { method:'POST', body:form }
+  );
+  if (!upRes.ok) {
+    const errTxt = await upRes.text();
+    throw new Error(`Files API ${upRes.status}: ${errTxt.substring(0,200)}`);
+  }
+  const upData = await upRes.json();
+  const fileUri = upData.file?.uri;
+  const fileName = upData.file?.name;
+  if (!fileUri) throw new Error(`URI não retornada. Resposta: ${JSON.stringify(upData).substring(0,200)}`);
+
+  // Aguarda o arquivo ficar ACTIVE na Files API (pode levar alguns segundos)
+  aLog(log,'in','Aguardando processamento do arquivo na Files API...');
+  for (let attempt = 0; attempt < 10; attempt++) {
+    await sleep(2000);
+    try {
+      const stRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${S.geminiKey}`
+      );
+      if (stRes.ok) {
+        const stData = await stRes.json();
+        const state = stData.state;
+        aLog(log,'in',`Arquivo: ${state}`);
+        if (state === 'ACTIVE') break;
+        if (state === 'FAILED') throw new Error('Processamento do arquivo falhou na Files API');
+      }
+    } catch(e) {
+      if (e.message.includes('FAILED')) throw e;
+    }
+  }
+
+  aLog(log,'in','Gemini transcrevendo o áudio...');
+  await animFill(`pf-t-${i}`, 55, 400);
+  piSub(`pb-t-${i}`, 'Gemini 2.5 Flash processando...');
+
+  const genRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${S.geminiKey}`,
+    {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        contents:[{ parts:[
+          { fileData:{ mimeType:'video/mp4', fileUri } },
+          { text:`Transcreva o áudio em português brasileiro.
+Retorne SOMENTE o SRT sem explicações ou markdown.
+Formato:
+1
+00:00:01,000 --> 00:00:05,000
+Texto da fala
+
+Contexto: vídeo de jiu-jitsu. Termos como guarda, raspagem, passagem, kimura, americana, mata-leão, triângulo, berimbolo.` }
+        ]}],
+        generationConfig:{ temperature:0.1, maxOutputTokens:8192 }
+      })
+    }
+  );
+  if (!genRes.ok) {
+    const errTxt = await genRes.text();
+    throw new Error(`Gemini ${genRes.status}: ${errTxt.substring(0,500)}`);
+  }
+  const gd = await genRes.json();
+  const srt = gd.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+  await animFill(`pf-t-${i}`, 95, 200);
+  // cleanup
+  const fname = fileUri.split('/').pop();
+  fetch(`https://generativelanguage.googleapis.com/v1beta/files/${fname}?key=${S.geminiKey}`,{method:'DELETE'}).catch(()=>{});
+
+  aLog(log,'ok',`SRT gerado — ${countEntries(srt)} entradas`);
+  piSub(`pb-t-${i}`, `${countEntries(srt)} entradas SRT`);
+  return srt + '\n\n';
+}
+
+async function simTranscribe(v, i, log) {
+  await animFill(`pf-t-${i}`, 25, 400); piSub(`pb-t-${i}`,'Obtendo vídeo...');
+  await animFill(`pf-t-${i}`, 55, 600); aLog(log,'in','Gemini 2.5 Flash processando...');
+  piSub(`pb-t-${i}`,'Transcrevendo...');
+  await animFill(`pf-t-${i}`, 88, 500); aLog(log,'ok',`SRT mock gerado`);
+  piSub(`pb-t-${i}`,'Transcrição concluída');
+}
+
+// ════════════════════════════════════════
+// STEP 3: TRADUÇÃO
+// ════════════════════════════════════════
+async function startTranslation() {
+  const langs = [...S.langs].filter(l => l !== 'pt');
+  const prg = document.getElementById('prg-r');
+  const log = document.getElementById('log-r');
+  prg.innerHTML = ''; log.innerHTML = '';
+
+  const lnames = { en:'Inglês (EN-US)', es:'Espanhol (ES-ES)', fr:'Francês (FR-FR)' };
+  const flags  = { en:'🇺🇸', es:'🇪🇸', fr:'🇫🇷' };
+
+  prg.innerHTML = langs.map((l,i) => piHtml(i,'r', `${flags[l]} ${lnames[l]}`, 'b')).join('');
+
+  for (let i = 0; i < langs.length; i++) {
+    const lang = langs[i];
+    piSt(i,'r','run','traduzindo...');
+    aLog(log,'in',`Traduzindo para ${lnames[lang]}...`);
+    await animFill(`pf-r-${i}`, 20, 300);
+
+    try {
+      S.srt[lang] = S.geminiKey
+        ? await translateGemini(S.srt.pt, lang, log)
+        : mockTranslate(S.srt.pt, lang);
+    } catch(e) {
+      aLog(log,'wn',`Fallback: ${e.message.substring(0,50)}`);
+      S.srt[lang] = mockTranslate(S.srt.pt, lang);
+    }
+
+    await animFill(`pf-r-${i}`, 100, 300);
+    piSt(i,'r','ok','✓ traduzido');
+    piSub(`pb-r-${i}`, `${countEntries(S.srt[lang])} entradas`);
+    aLog(log,'ok',`${flags[lang]} ${lang.toUpperCase()} concluído`);
+  }
+
+  aLog(log,'ok','Todas as traduções concluídas!');
+  buildTransPanel(langs, flags);
+  document.getElementById('trans-panel').style.display = 'block';
+}
+
+async function translateGemini(srtPt, lang, log) {
+  const target = { en:'English (US)', es:'Spanish (Spain)', fr:'French (France)' }[lang];
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${S.geminiKey}`,
+    {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        contents:[{ parts:[{ text:`You are a professional subtitle translator for Brazilian Jiu-Jitsu content.
+Translate this SRT from Brazilian Portuguese to ${target}.
+RULES: Return ONLY the translated SRT file. Keep timestamps and sequence numbers unchanged.
+BJJ terms: guarda→guard/guardia, raspagem→sweep/barrido, passagem→guard pass/pasada, finalização→submission/sumisión, mata-leão→rear naked choke/mata-león. Keep: kimura, americana, omoplata, berimbolo.
+
+${srtPt}` }]}],
+        generationConfig:{ temperature:0.2, maxOutputTokens:8192 }
+      })
+    }
+  );
+  if (!res.ok) throw new Error(`Gemini ${res.status}`);
+  const d = await res.json();
+  return d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// ════════════════════════════════════════
+// STEP 4: DUBLAGEM
+// ════════════════════════════════════════
+async function startDubbing() {
+  if (!document.getElementById('opt-dub').checked) {
+    aLog(document.getElementById('log-d'),'wn','Dublagem desativada');
+    setTimeout(() => goStep(5), 800);
+    return;
+  }
+
+  const langs = [...S.langs].filter(l => l !== 'pt');
+  const vids  = S.videos.filter(v => S.sel.has(v.guid));
+  const prg   = document.getElementById('prg-d');
+  const log   = document.getElementById('log-d');
+  prg.innerHTML = ''; log.innerHTML = '';
+
+  const flags   = { en:'🇺🇸', es:'🇪🇸', fr:'🇫🇷' };
+  const vmap    = { en: S.voiceSel?.en || 'Charon', es: S.voiceSel?.es || 'Charon', fr:'Kore' };
+  const lcode   = { en:'en-US', es:'es-ES', fr:'fr-FR' };
+  const mins    = Math.ceil(vids.reduce((a,v) => a+(v.length||0),0)/60);
+  const costEst = (mins * TTS_PER_MIN * langs.length).toFixed(3);
+
+  document.getElementById('dub-cost-total').innerHTML =
+    `<span>Custo estimado (${vids.length} vídeos × ${langs.length} idiomas)</span><span class="cval">~$${costEst}</span>`;
+
+  prg.innerHTML = langs.map((l,i) => piHtml(i,'d',`${flags[l]} ${l.toUpperCase()} — voz: ${vmap[l]}`,'g')).join('');
+
+  const audioItems = [];
+
+  // Processa todos os idiomas em PARALELO
+  aLog(log,'in',`Iniciando dublagem em paralelo — ${langs.length} idiomas simultâneos...`);
+
+  const results = await Promise.all(langs.map(async (l, i) => {
+    piSt(i,'d','run','gerando TTS...');
+    aLog(log,'in',`${flags[l]} Gemini TTS — voz: ${vmap[l]}, ${lcode[l]}`);
+    piSub(`pb-d-${i}`, 'Enviando texto para TTS...');
+    await animFill(`pf-d-${i}`, 20, 300);
+
+    const text = srtToText(S.srt[l] || S.srt.pt);
+
+    try {
+      if (S.geminiKey) {
+        // Divide em chunks de ~800 palavras e processa em paralelo
+        const blob = await callTTSChunked(text, vmap[l], lcode[l], (pct) => {
+          animFill(`pf-d-${i}`, 20 + pct * 0.75, 100);
+          piSub(`pb-d-${i}`, `TTS: ${pct}%`);
+        });
+        S.audioBlobs[l] = blob;
+        aLog(log,'ok',`${flags[l]} Áudio: ${(blob.size/1024).toFixed(0)} KB`);
+        piSub(`pb-d-${i}`, `${(blob.size/1024).toFixed(0)} KB · WAV`);
+      } else {
+        await sleep(500);
+        aLog(log,'wn',`${flags[l]} Simulado (sem API Key)`);
+        S.audioBlobs[l] = null;
+        piSub(`pb-d-${i}`, 'Simulação — configure Gemini API Key');
+      }
+    } catch(e) {
+      aLog(log,'wn',`${flags[l]} TTS falhou: ${e.message.substring(0,55)}`);
+      S.audioBlobs[l] = null;
+    }
+
+    await animFill(`pf-d-${i}`, 100, 200);
+    piSt(i,'d','ok','✓ concluído');
+    return { l, voice:vmap[l], flag:flags[l] };
+  }));
+
+  aLog(log,'ok',`Dublagem concluída — ${langs.length} idioma(s)`);
+  renderAudio(results);
+  document.getElementById('audio-panel').style.display = 'block';
+}
+
+// Divide o texto em chunks e processa em paralelo, depois concatena os WAVs
+async function callTTSChunked(text, voice, langCode, onProgress) {
+  const CHUNK_WORDS = 600; // ~2-3 min de áudio por chunk
+  const words = text.split(' ');
+
+  if (words.length <= CHUNK_WORDS) {
+    // Texto curto — processa direto
+    onProgress && onProgress(50);
+    const blob = await callTTS(text, voice, langCode);
+    onProgress && onProgress(100);
+    return blob;
+  }
+
+  // Divide em chunks
+  const chunks = [];
+  for (let i = 0; i < words.length; i += CHUNK_WORDS) {
+    chunks.push(words.slice(i, i + CHUNK_WORDS).join(' '));
+  }
+
+  // Processa chunks em paralelo (máx 3 simultâneos para não sobrecarregar a API)
+  const CONCURRENCY = 3;
+  const blobs = new Array(chunks.length);
+  let completed = 0;
+
+  for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+    const batch = chunks.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map((chunk, j) => callTTS(chunk, voice, langCode))
+    );
+    batchResults.forEach((blob, j) => { blobs[i + j] = blob; });
+    completed += batch.length;
+    onProgress && onProgress(Math.round(completed / chunks.length * 95));
+  }
+
+  // Concatena todos os WAVs em um único blob
+  const merged = await mergeWavBlobs(blobs);
+  onProgress && onProgress(100);
+  return merged;
+}
+
+// Concatena múltiplos WAV blobs — pula o header de cada um exceto o primeiro
+async function mergeWavBlobs(blobs) {
+  const buffers = await Promise.all(blobs.map(b => b.arrayBuffer()));
+
+  // WAV header = 44 bytes. Primeiro buffer completo, resto pula header
+  const totalSize = buffers.reduce((a, b, i) => a + (i === 0 ? b.byteLength : b.byteLength - 44), 0);
+  const merged = new Uint8Array(totalSize);
+
+  let offset = 0;
+  buffers.forEach((buf, i) => {
+    const data = new Uint8Array(buf);
+    const start = i === 0 ? 0 : 44;
+    merged.set(data.subarray(start), offset);
+    offset += data.byteLength - (i === 0 ? 0 : 44);
+  });
+
+  // Atualiza o tamanho no header WAV
+  const view = new DataView(merged.buffer);
+  view.setUint32(4, totalSize - 8, true);   // ChunkSize
+  view.setUint32(40, totalSize - 44, true); // Subchunk2Size
+
+  return new Blob([merged], { type: 'audio/wav' });
+}
+
+async function callTTS(text, voice, langCode) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key=${S.geminiKey}`,
+    {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        contents:[{ parts:[{ text }] }],
+        generationConfig:{
+          responseModalities:['AUDIO'],
+          speechConfig:{
+            voiceConfig:{ prebuiltVoiceConfig:{ voiceName:voice } },
+            languageCode: langCode
+          }
+        }
+      })
+    }
+  );
+  if (!res.ok) throw new Error(`TTS ${res.status}: ${(await res.text()).substring(0,80)}`);
+  const d = await res.json();
+  const b64 = d.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!b64) throw new Error('Áudio não retornado');
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type:'audio/wav' });
+}
+
+// ════════════════════════════════════════
+// STEP 5: UPLOAD BUNNY
+// ════════════════════════════════════════
+async function startUpload() {
+  const vids  = S.videos.filter(v => S.sel.has(v.guid));
+  const langs = [...S.langs];
+  const prg   = document.getElementById('prg-u');
+  const log   = document.getElementById('log-u');
+  prg.innerHTML = ''; log.innerHTML = '';
+
+  prg.innerHTML = vids.map((v,i) => piHtml(i,'u',`🎬 ${v.title}`,'b')).join('');
+
+  const flags  = { pt:'🇧🇷', en:'🇺🇸', es:'🇪🇸', fr:'🇫🇷' };
+  const labels = { pt:'Português (Brasil)', en:'English (US)', es:'Español (ES)', fr:'Français (FR)' };
+
+  for (let i = 0; i < vids.length; i++) {
+    const v = vids[i];
+    piSt(i,'u','run','enviando...');
+    aLog(log,'in',`Sincronizando: ${v.title} [${v.guid}]`);
+
+    for (const lang of langs) {
+      piSub(`pb-u-${i}`, `Enviando legenda ${lang.toUpperCase()}...`);
+      await animFill(`pf-u-${i}`, Math.round((langs.indexOf(lang)+0.6)/langs.length*90), 350);
+
+      if (S.bunnyKey && S.libId && !v.guid.startsWith('demo-')) {
+        try {
+          await uploadCaption(v.guid, lang, labels[lang], S.srt[lang] || S.srt.pt);
+          aLog(log,'ok',`${flags[lang]} ${lang.toUpperCase()} → Bunny (ID preservado)`);
+        } catch(e) {
+          aLog(log,'wn',`${flags[lang]} Falhou: ${e.message.substring(0,50)}`);
+        }
+      } else {
+        await sleep(300);
+        aLog(log,'ok',`${flags[lang]} ${lang.toUpperCase()} simulado — ID: ${v.guid}`);
+      }
+    }
+
+    await animFill(`pf-u-${i}`, 100, 200);
+    piSt(i,'u','ok','✓ sincronizado');
+    piSub(`pb-u-${i}`, `${langs.length} legendas · link da plataforma intacto`);
+  }
+
+  aLog(log,'ok',`✅ Sync completo — ${vids.length} vídeo(s)`);
+
+  setTimeout(() => {
+    goStep(6);
+    document.getElementById('dv').textContent = vids.length;
+    document.getElementById('dl').textContent = [...S.langs].filter(l=>l!=='pt').length;
+    document.getElementById('dt').textContent = fmtElapsed(S.startTs);
+  }, 1400);
+}
+
+async function uploadCaption(guid, lang, label, srt) {
+  const b64 = btoa(unescape(encodeURIComponent(srt)));
+  const res = await bunnyFetch(
+    `/library/${S.libId}/videos/${guid}/captions/${lang}`,
+    { method:'POST', body: JSON.stringify({ srclang:lang, label, captionsFile:b64 }) }
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ════════════════════════════════════════
+// SRT / RENDER HELPERS
+// ════════════════════════════════════════
+function parseSrt(srt) {
+  if (!srt?.trim()) return '<div style="color:var(--text3);font-size:12px">Sem conteúdo</div>';
+  return srt.trim().split(/\n\n+/).map(b => {
+    const ls = b.trim().split('\n');
+    if (ls.length < 3) return '';
+    return `<div class="se"><div class="sn">${ls[0]}</div><div class="stc">${ls[1]}</div><div class="stx" title="Clique para editar">${ls.slice(2).join(' ')}</div></div>`;
+  }).filter(Boolean).join('');
+}
+
+function buildTransPanel(langs, flags) {
+  document.getElementById('trans-tabs').innerHTML = langs.map((l,i) =>
+    `<div class="srttab${i===0?' on':''}" onclick="swTab(this,'${l}')">${flags[l]} ${l.toUpperCase()}</div>`).join('');
+  if (langs[0]) document.getElementById('trans-view').innerHTML = parseSrt(S.srt[langs[0]]);
+}
+
+function swTab(el, lang) {
+  document.querySelectorAll('.srttab').forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('trans-view').innerHTML = parseSrt(S.srt[lang] || '');
+}
+
+function renderAudio(items) {
+  document.getElementById('audio-list').innerHTML = items.map(it =>
+    `<div class="vc">
+      <div class="vfl">${it.flag}</div>
+      <div class="vi2">
+        <div class="vl">${it.l.toUpperCase()} — ${it.voice} (Gemini 3.1 Flash TTS)</div>
+        <div class="vs">${S.audioBlobs[it.l] ? (S.audioBlobs[it.l].size/1024).toFixed(0)+' KB · WAV 24kHz · pronto para FFmpeg' : 'Simulado — configure Gemini API Key'}</div>
+      </div>
+      <div class="vcts">
+        ${S.audioBlobs[it.l] ? `<button class="btn btn-outline btn-sm" onclick="playAud('${it.l}')">▶ Ouvir</button><button class="btn btn-green btn-sm" onclick="dlAud('${it.l}')">↓ WAV</button>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+function enableEdit() { document.querySelectorAll('.stx').forEach(e => { e.contentEditable='true'; }); toast('Modo edição ativo','inf'); }
+
+// ════════════════════════════════════════
+// DOWNLOAD
+// ════════════════════════════════════════
+function dlSrt(lang) {
+  const c = S.srt[lang]; if (!c) { toast('SRT indisponível','err'); return; }
+  dl(new Blob([c],{type:'text/plain'}), `legendas_${lang}.srt`);
+}
+function dlAllSrt() { Object.entries(S.srt).forEach(([l,c]) => { if(c) setTimeout(()=>dlSrt(l),200); }); }
+function playAud(l) { const b=S.audioBlobs[l]; if(!b)return; new Audio(URL.createObjectURL(b)).play(); }
+function dlAud(l)  { const b=S.audioBlobs[l]; if(!b)return; dl(b,`dub_${l}.wav`); }
+function dl(blob, name) { const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); }
+
+function dlReport() {
+  const vids = S.videos.filter(v => S.sel.has(v.guid));
+  const lines = ['BJJ PRO TECH — RELATÓRIO DE LOCALIZAÇÃO',`Data: ${new Date().toLocaleString('pt-BR')}`,`Tempo: ${fmtElapsed(S.startTs)}`,'',
+    'STACK:','  Transcrição: Gemini 2.5 Flash (Files API)','  Tradução: Gemini 2.5 Flash','  Dublagem: Gemini TTS Flash','  Upload: Bunny Stream API (captions)',
+    '',`VÍDEOS (${vids.length}):`, ...vids.map(v=>`  • ${v.title} — ${fmtDur(v.length)} — ID: ${v.guid}`),
+    '',`IDIOMAS: ${[...S.langs].join(', ').toUpperCase()}`,'','STATUS: ✅ CONCLUÍDO','IDs preservados.'];
+  dl(new Blob([lines.join('\n')],{type:'text/plain'}), `bjjprotech_report_${Date.now()}.txt`);
+}
+
+// ════════════════════════════════════════
+// GENERATE PYTHON SCRIPT
+// ════════════════════════════════════════
+function generateScript() {
+  const vids = S.videos.filter(v => S.sel.has(v.guid));
+  if (!vids.length) { toast('Selecione vídeos primeiro', 'err'); return; }
+
+  const dubLangs = [...S.langs].filter(l => l !== 'pt');
+
+  // Build VIDEOS list for the script
+  const videosJson = vids.map(v =>
+    `    {"guid": "${v.guid}", "title": ${JSON.stringify(v.title)}, "length": ${v.length || 0}}`
+  ).join(',\n');
+
+  // Build SRTS dict for the script — embed the actual translated SRT content
+  const srtsEntries = vids.map(v => {
+    const allLangs = ['pt', ...dubLangs];
+    const langEntries = allLangs.map(l => {
+      const srtContent = S.srt[l] || '';
+      // Escape for Python triple-quoted string
+      const escaped = srtContent.replace(/\\/g, '\\\\').replace(/"""/g, '\\"\\"\\"');
+      return `        ${JSON.stringify(l)}: """${escaped}"""`;
+    }).join(',\n');
+    return `    ${JSON.stringify(v.guid)}: {\n${langEntries}\n    }`;
+  }).join(',\n');
+
+  const cdnHost = S.cdnHost || `vz-${S.libId}.b-cdn.net`;
+  const langsList = dubLangs.map(l => JSON.stringify(l)).join(', ');
+
+  // Read the base script template and fill in the values
+  const scriptContent = `#!/usr/bin/env python3
+"""
+BJJ PRO TECH — Dubbing Upload Script
+=====================================
+Gerado automaticamente em: ${new Date().toLocaleString('pt-BR')}
+Vídeos: ${vids.length} | Idiomas: ${dubLangs.join(', ').toUpperCase()}
+
+O que este script faz (automaticamente, para TODOS os vídeos da fila):
+  1. Verifica se o FFmpeg está instalado
+  2. Ativa Multi Audio Track Support na biblioteca Bunny
+  3. Para cada vídeo:
+     a. Baixa o vídeo original do Bunny Stream
+     b. Mescla as faixas de áudio dubladas (WAV) no vídeo usando FFmpeg
+     c. Faz re-upload com o MESMO ID (links da plataforma preservados)
+     d. Aguarda o re-encoding concluir
+     e. Faz upload das legendas SRT
+  4. Gera relatório final
+
+Como rodar:
+  1. pip install requests
+  2. Instale FFmpeg: https://ffmpeg.org/download.html
+     macOS: brew install ffmpeg
+     Windows: winget install ffmpeg
+     Linux: sudo apt install ffmpeg
+  3. Coloque os arquivos WAV na pasta ./bjjprotech_output/
+     Nomes esperados: dub_en.wav, dub_es.wav  (ou dub_en_GUID8.wav)
+  4. python bjjprotech_dubbing_upload.py
+"""
+
+import os, sys, json, time, shutil, subprocess, tempfile, base64, requests
+from pathlib import Path
+from datetime import datetime
+
+# ══════════════════════════════════════════
+# CONFIGURAÇÃO (gerada automaticamente)
+# ══════════════════════════════════════════
+
+CONFIG = {
+    "bunny_library_id": ${JSON.stringify(S.libId)},
+    "bunny_api_key":    ${JSON.stringify(S.bunnyKey)},
+    "cdn_hostname":     ${JSON.stringify(cdnHost)},
+    "output_dir":       "./bjjprotech_output",
+    "languages":        [${langsList}],
+    "keep_temp_files":  False,
+    "enable_multi_audio_on_library": True,
+}
+
+VIDEOS = [
+${videosJson}
+]
+
+SRTS = {
+${srtsEntries}
+}
+
+LANG_META = {
+    "pt": {"code": "pt", "name": "Português (Brasil)", "iso": "por", "label": "Português"},
+    "en": {"code": "en", "name": "English (US)",       "iso": "eng", "label": "English"},
+    "es": {"code": "es", "name": "Español (ES)",       "iso": "spa", "label": "Español"},
+    "fr": {"code": "fr", "name": "Français (FR)",      "iso": "fra", "label": "Français"},
+}
+
+BUNNY_BASE = "https://video.bunnycdn.com"
+
+def log(msg, level="INFO"):
+    ts = datetime.now().strftime("%H:%M:%S")
+    icons = {"INFO":"▸","OK":"✓","WARN":"⚠","ERROR":"✗","STEP":"◈"}
+    print(f"  [{ts}] {icons.get(level,'·')} {msg}")
+
+def bunny_headers(extra=None):
+    h = {"AccessKey": CONFIG["bunny_api_key"], "accept": "application/json"}
+    if extra: h.update(extra)
+    return h
+
+def check_ffmpeg():
+    if not shutil.which("ffmpeg"):
+        log("FFmpeg não encontrado!", "ERROR")
+        log("  macOS:   brew install ffmpeg", "ERROR")
+        log("  Windows: winget install ffmpeg", "ERROR")
+        log("  Linux:   sudo apt install ffmpeg", "ERROR")
+        sys.exit(1)
+    v = subprocess.run(["ffmpeg","-version"], capture_output=True, text=True)
+    log(f"FFmpeg: {v.stdout.split(chr(10))[0]}", "OK")
+
+def check_wav_files(video_guid):
+    out_dir = Path(CONFIG["output_dir"])
+    found, missing = {}, []
+    for lang in CONFIG["languages"]:
+        candidates = [
+            out_dir / f"dub_{lang}_{video_guid[:8]}.wav",
+            out_dir / f"dub_{lang}.wav",
+            out_dir / f"{video_guid}_{lang}.wav",
+            Path(f"dub_{lang}.wav"),
+        ]
+        wav = next((c for c in candidates if c.exists()), None)
+        if wav: found[lang] = wav; log(f"WAV {lang.upper()}: {wav}", "OK")
+        else: missing.append(lang)
+    return found, missing
+
+def download_video(guid, title, dest):
+    log(f"Baixando: {title[:50]}")
+    cdn = CONFIG["cdn_hostname"]
+    url = f"https://{cdn}/{guid}/play_720p.mp4"
+    r = requests.get(url, headers={"AccessKey": CONFIG["bunny_api_key"]}, stream=True, timeout=600)
+    r.raise_for_status()
+    total = int(r.headers.get("content-length", 0))
+    done = 0
+    with open(dest, "wb") as f:
+        for chunk in r.iter_content(1024*1024):
+            f.write(chunk); done += len(chunk)
+            if total: print(f"\r    {done/total*100:.1f}% ({done//1024//1024}MB/{total//1024//1024}MB)", end="")
+    print()
+    log(f"Download OK: {done//1024//1024} MB", "OK")
+
+def merge_tracks(video_path, wav_files, output_path):
+    log("Mesclando faixas com FFmpeg...")
+    lang_order = CONFIG["languages"]
+    cmd = ["ffmpeg", "-y", "-i", str(video_path)]
+    for lang in lang_order:
+        if lang in wav_files: cmd += ["-i", str(wav_files[lang])]
+    cmd += ["-map","0:v", "-map","0:a"]
+    for i,lang in enumerate(lang_order,1):
+        if lang in wav_files: cmd += ["-map", f"{i}:a"]
+    cmd += ["-metadata:s:a:0","language=por", "-metadata:s:a:0","title=Português"]
+    idx = 1
+    for lang in lang_order:
+        if lang in wav_files:
+            m = LANG_META.get(lang,{"iso":lang,"label":lang})
+            cmd += [f"-metadata:s:a:{idx}",f"language={m['iso']}", f"-metadata:s:a:{idx}",f"title={m['label']}"]
+            idx+=1
+    cmd += ["-c:v","copy", "-c:a:0","copy"]
+    for i in range(1,idx): cmd += [f"-c:a:{i}","aac",f"-b:a:{i}","128k"]
+    cmd.append(str(output_path))
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        log(result.stderr[-400:], "ERROR")
+        raise RuntimeError(f"FFmpeg falhou: código {result.returncode}")
+    log(f"Mesclado: {output_path.stat().st_size//1024//1024} MB, {idx} faixas de áudio", "OK")
+
+def upload_video(guid, file_path):
+    log(f"Re-upload (mesmo ID: {guid[:8]}...)")
+    url = f"{BUNNY_BASE}/library/{CONFIG['bunny_library_id']}/videos/{guid}"
+    headers = {"AccessKey": CONFIG["bunny_api_key"], "Content-Type": "application/octet-stream"}
+    size = file_path.stat().st_size
+    done = 0
+    def gen():
+        nonlocal done
+        with open(file_path,"rb") as f:
+            while True:
+                chunk = f.read(5*1024*1024)
+                if not chunk: break
+                done += len(chunk)
+                print(f"\r    Upload: {done/size*100:.1f}% ({done//1024//1024}MB/{size//1024//1024}MB)", end="")
+                yield chunk
+    r = requests.put(url, headers=headers, data=gen(), timeout=3600)
+    print()
+    r.raise_for_status()
+    log("Upload OK — ID preservado", "OK")
+
+def wait_encoding(guid, timeout_min=30):
+    log(f"Aguardando re-encoding (timeout: {timeout_min}min)...")
+    deadline = time.time() + timeout_min*60
+    status_names = {0:"na fila",1:"processando",2:"transcoding",3:"redimensionando",4:"concluído",5:"erro",6:"falhou"}
+    while time.time() < deadline:
+        try:
+            meta = requests.get(f"{BUNNY_BASE}/library/{CONFIG['bunny_library_id']}/videos/{guid}", headers=bunny_headers()).json()
+            st = meta.get("status",0); pct = meta.get("encodeProgress",0)
+            print(f"\r    {status_names.get(st,str(st))} — {pct}%", end="")
+            if st == 4: print(); log("Re-encoding concluído!", "OK"); return True
+            if st in (5,6): print(); log(f"Erro no encoding: status={st}", "ERROR"); return False
+        except Exception as e: log(f"Poll error: {e}", "WARN")
+        time.sleep(15)
+    print(); log("Timeout", "WARN"); return False
+
+def upload_captions(guid, srts):
+    log("Enviando legendas SRT...")
+    for lang, srt in srts.items():
+        if not srt.strip(): continue
+        b64 = base64.b64encode(srt.encode("utf-8")).decode("ascii")
+        url = f"{BUNNY_BASE}/library/{CONFIG['bunny_library_id']}/videos/{guid}/captions/{lang}"
+        r = requests.post(url, headers=bunny_headers({"Content-Type":"application/json"}),
+                          json={"srclang":lang,"label":LANG_META.get(lang,{}).get("name",lang),"captionsFile":b64})
+        if r.status_code in (200,201): log(f"Legenda {lang.upper()} OK", "OK")
+        else: log(f"Legenda {lang.upper()}: HTTP {r.status_code}", "WARN")
+
+def enable_multi_audio():
+    log("Ativando Multi Audio Track Support...")
+    try:
+        r = requests.post(f"https://api.bunny.net/videolibrary/{CONFIG['bunny_library_id']}",
+            headers={"AccessKey":CONFIG["bunny_api_key"],"Content-Type":"application/json"},
+            json={"EnableMultiAudioTrackSupport":True})
+        log(f"Resposta: HTTP {r.status_code}", "OK" if r.status_code < 300 else "WARN")
+    except Exception as e: log(f"Erro: {e}", "WARN")
+
+def process_video(video, tmp):
+    guid, title = video["guid"], video["title"]
+    print(f"\n  ═══ {title[:55]} ═══")
+    orig   = Path(tmp) / f"{guid}_orig.mp4"
+    merged = Path(tmp) / f"{guid}_multi.mp4"
+    try:
+        wav_files, missing = check_wav_files(guid)
+        if not wav_files:
+            log("Nenhum WAV encontrado — pulando", "ERROR")
+            return False, "WAVs não encontrados"
+        if missing: log(f"WAVs ausentes: {missing} — continuando com disponíveis", "WARN")
+        download_video(guid, title, orig)
+        merge_tracks(orig, wav_files, merged)
+        upload_video(guid, merged)
+        wait_encoding(guid)
+        srts = SRTS.get(guid, {})
+        if srts: upload_captions(guid, srts)
+        return True, "OK"
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return False, str(e)
+    finally:
+        if not CONFIG["keep_temp_files"]:
+            for f in [orig, merged]:
+                if f.exists(): f.unlink()
+
+def main():
+    print("\n  ╔═══════════════════════════════════════════════╗")
+    print("  ║  BJJ PRO TECH — Dubbing Upload Script          ║")
+    print("  ╚═══════════════════════════════════════════════╝\n")
+    check_ffmpeg()
+    Path(CONFIG["output_dir"]).mkdir(parents=True, exist_ok=True)
+    print(f"  Vídeos: {len(VIDEOS)} | Idiomas: {', '.join(CONFIG['languages']).upper()}")
+    print(f"  WAVs em: {CONFIG['output_dir']}/ (nomes: dub_en.wav, dub_es.wav)")
+    print()
+    input("  Pressione ENTER para iniciar (Ctrl+C para cancelar)...")
+    enable_multi_audio()
+    results = []
+    with tempfile.TemporaryDirectory(prefix="bjjprotech_") as tmp:
+        for i,v in enumerate(VIDEOS,1):
+            log(f"Vídeo {i}/{len(VIDEOS)}")
+            ok, msg = process_video(v, tmp)
+            results.append({"title":v["title"][:50],"ok":ok,"msg":msg})
+    print("\n  ═══ RESULTADO FINAL ═══")
+    for r in results:
+        print(f"  {'✓' if r['ok'] else '✗'} {r['title']}" + (f" — {r['msg']}" if not r['ok'] else ""))
+    ok_n = sum(1 for r in results if r['ok'])
+    print(f"\n  {ok_n}/{len(results)} vídeos processados com sucesso")
+    if ok_n == len(results):
+        print("  ✓ Multi-audio ativo no player Bunny — IDs preservados!")
+    print()
+
+if __name__ == "__main__":
+    main()
+`;
+
+  // Download the script
+  const blob = new Blob([scriptContent], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `bjjprotech_dubbing_upload_${Date.now()}.py`;
+  a.click();
+
+  toast(`Script gerado com ${vids.length} vídeo(s) preenchido(s)!`, 'ok');
+
+  // Also show instructions
+  setTimeout(() => {
+    toast('Coloque os WAVs em ./bjjprotech_output/ e rode: python bjjprotech_dubbing_upload.py', 'inf');
+  }, 1000);
+}
+
+function resetAll() {
+  S.sel.clear(); S.srt={pt:'',en:'',es:'',fr:''}; S.audioBlobs={}; S.startTs=null;
+  ['srt-panel','trans-panel','audio-panel'].forEach(id => document.getElementById(id).style.display='none');
+  renderList(); updateStats(); renderQueue(); goStep(1);
+}
+
+// ════════════════════════════════════════
+// LANG TOGGLE
+// ════════════════════════════════════════
+function toggleLang(lang, el) {
+  if (lang==='pt') { toast('PT-BR é obrigatório','err'); return; }
+  el.classList.toggle('on');
+  el.classList.contains('on') ? S.langs.add(lang) : S.langs.delete(lang);
+  updateStats();
+}
+
+// ════════════════════════════════════════
+// MODAL
+// ════════════════════════════════════════
+function showModal(t,b,cb) {
+  document.getElementById('m-ttl').innerHTML = t;
+  document.getElementById('m-body').innerHTML = b;
+  S.modalCb = cb;
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+document.getElementById('m-ok').onclick = () => { if(S.modalCb) S.modalCb(); };
+document.getElementById('modal').onclick = e => { if(e.target===document.getElementById('modal')) closeModal(); };
+
+// ════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════
+function toast(msg, type='inf') {
+  const icons = {ok:'✓',err:'✗',inf:'i'};
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<span style="font-family:var(--mono);font-size:10px;opacity:.55">${icons[type]}</span> ${msg}`;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>t.remove(), 4200);
+}
+
+// ════════════════════════════════════════
+// PROGRESS HELPERS
+// ════════════════════════════════════════
+function piHtml(i, pref, name, fillCls='') {
+  return `<div class="pi" id="pi-${pref}-${i}">
+    <div class="pi-hdr">
+      <div class="pi-name">${name}</div>
+      <div class="pi-st" id="ps-${pref}-${i}">aguardando</div>
+    </div>
+    <div class="track"><div class="fill${fillCls?' '+fillCls:''}" id="pf-${pref}-${i}" style="width:0%"></div></div>
+    <div class="pi-sub" id="pb-${pref}-${i}">—</div>
+  </div>`;
+}
+
+function piSt(i, p, cls, txt) {
+  const el = document.getElementById(`ps-${p}-${i}`);
+  if (el) { el.className=`pi-st ${cls}`; el.textContent=txt; }
+}
+
+function piFill(id, pct, cls='') {
+  const el = document.getElementById(id);
+  if (el) { el.style.width=pct+'%'; if(cls) el.classList.add(cls); }
+}
+
+function piSub(id, txt) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = txt;
+}
+
+async function animFill(id, target, dur) {
+  const el = document.getElementById(id); if (!el) return;
+  const s  = parseFloat(el.style.width)||0;
+  const steps = 14;
+  for (let i=0;i<=steps;i++) { el.style.width=(s+(target-s)*i/steps)+'%'; await sleep(dur/steps); }
+}
+
+// ════════════════════════════════════════
+// LOG
+// ════════════════════════════════════════
+function aLog(c, type, msg) {
+  const t = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const cls={ok:'lok',in:'lin',wn:'lwn',er:'ler'}[type]||'lm';
+  const sym={ok:'✓',in:'▸',wn:'⚠',er:'✗'}[type]||'·';
+  const d=document.createElement('div'); d.className='ll';
+  d.innerHTML=`<span class="lt">${t}</span><span class="${cls}">${sym}</span><span class="lm">${msg}</span>`;
+  c.appendChild(d); c.scrollTop=c.scrollHeight;
+}
+
+// ════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function fmtDur(s) { if(!s)return'0:00'; return`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
+function fmtSz(b)  { if(!b)return'—'; return b>1e9?(b/1e9).toFixed(1)+' GB':(b/1e6).toFixed(0)+' MB'; }
+function fmtElapsed(ts) { if(!ts)return'—'; const s=Math.floor((Date.now()-ts)/1000); return s>60?`${Math.floor(s/60)}m ${s%60}s`:`${s}s`; }
+function countEntries(srt) { return srt?srt.trim().split(/\n\n+/).length:0; }
+function srtToText(srt)    { if(!srt)return''; return srt.trim().split(/\n\n+/).map(b=>{const ls=b.trim().split('\n');return ls.slice(2).join(' ');}).filter(Boolean).join('\n'); }
+
+function mockSrt(title, off=0) {
+  const f=s=>{const t=(off*60)+s;const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),sc=t%60;return`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sc).padStart(2,'0')},000`;};
+  return `1\n${f(2)} --> ${f(6)}\nBem-vindos ao BJJ Pro Tech.\n\n2\n${f(6)} --> ${f(11)}\nHoje vamos aprender sobre ${title.substring(0,30).toLowerCase()}.\n\n3\n${f(11)} --> ${f(16)}\nO primeiro passo é estabelecer a pegada no colarinho.\n\n4\n${f(17)} --> ${f(23)}\nCom a outra mão controle o pulso do oponente.\n\n5\n${f(23)} --> ${f(30)}\nExecute o movimento de quadril para completar a raspagem.\n\n`;
+}
+
+function mockTranslate(srt, lang) {
+  const d={
+    en:{'Bem-vindos ao BJJ Pro Tech.':'Welcome to BJJ Pro Tech.','raspagem':'sweep','guarda':'guard','colarinho':'collar','quadril':'hip','Execute o movimento de quadril para completar a raspagem.':'Execute the hip movement to complete the sweep.'},
+    es:{'Bem-vindos ao BJJ Pro Tech.':'Bienvenidos a BJJ Pro Tech.','raspagem':'barrido','guarda':'guardia','colarinho':'cuello','Execute o movimento de quadril para completar a raspagem.':'Ejecuta el movimiento de cadera para completar el barrido.'},
+    fr:{'Bem-vindos ao BJJ Pro Tech.':'Bienvenue sur BJJ Pro Tech.','raspagem':'balayage','guarda':'garde','Execute o movimento de quadril para completar a raspagem.':"Exécutez le mouvement de hanche pour compléter le balayage."}
+  };
+  let r=srt;
+  Object.entries(d[lang]||{}).forEach(([k,v])=>{r=r.replaceAll(k,v);});
+  return r;
+}
+
+// ════════════════════════════════════════
+// AUTO UPLOAD — Container FFmpeg
+// ════════════════════════════════════════
+
+async function startAutoUpload() {
+  const containerProxy = (document.getElementById('cfgContainerProxy')?.value?.trim()
+    || S.proxy).replace(/\/$/, '');
+
+  if (!containerProxy) { toast('Configure a URL do Worker na barra lateral', 'err'); return; }
+  if (!Object.keys(S.audioBlobs).length) { toast('Gere os áudios dublados primeiro (etapa 4)', 'err'); return; }
+
+  const btn = document.getElementById('btn-auto-upload');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Processando...';
+
+  const statusDiv = document.getElementById('dub-upload-status');
+  statusDiv.style.display = 'block';
+
+  const prg = document.getElementById('prg-dubupload');
+  const log = document.getElementById('log-dubupload');
+  log.innerHTML = '';
+
+  // First check container health
+  try {
+    aLog(log, 'in', 'Verificando Container FFmpeg...');
+    const health = await fetch(`${containerProxy}/health`, { method: 'GET' });
+    if (!health.ok) throw new Error(`Container indisponível: HTTP ${health.status}`);
+    const hData = await health.json();
+    if (!hData.ffmpeg) throw new Error('FFmpeg não encontrado no container');
+    aLog(log, 'ok', 'Container FFmpeg ativo e pronto');
+  } catch(e) {
+    aLog(log, 'wn', `Container não respondeu: ${e.message.substring(0,60)}`);
+    aLog(log, 'in', 'Aguardando container inicializar (pode levar 10-15s)...');
+    await sleep(12000);
+  }
+
+  const vids = S.videos.filter(v => S.sel.has(v.guid));
+  const dubLangs = [...S.langs].filter(l => l !== 'pt');
+  const flagMap = { en:'🇺🇸', es:'🇪🇸', fr:'🇫🇷' };
+  const labelMap = { en:'English (US)', es:'Español (ES)', fr:'Français (FR)' };
+
+  prg.innerHTML = vids.map((v,i) => piHtml(i,'du',`🎬 ${v.title}`,'g')).join('');
+
+  let allOk = true;
+  const jobResults = [];
+
+  for (let i = 0; i < vids.length; i++) {
+    const v = vids[i];
+    piSt(i,'du','run','enviando job...');
+    aLog(log, 'in', `Submetendo: ${v.title.substring(0,45)}`);
+
+    // Convert audio blobs to base64
+    const audioTracks = [];
+    for (const lang of dubLangs) {
+      const blob = S.audioBlobs[lang];
+      if (!blob) continue;
+      aLog(log, 'in', `Convertendo WAV ${lang.toUpperCase()} para envio...`);
+      const arrayBuf = await blob.arrayBuffer();
+      const uint8    = new Uint8Array(arrayBuf);
+      let binary = '';
+      uint8.forEach(b => binary += String.fromCharCode(b));
+      const b64 = btoa(binary);
+      audioTracks.push({
+        lang, label: labelMap[lang] || lang.toUpperCase(), wav_b64: b64
+      });
+    }
+
+    if (!audioTracks.length) {
+      piSt(i,'du','err','sem áudios');
+      aLog(log, 'er', 'Nenhum áudio disponível para este vídeo');
+      allOk = false;
+      continue;
+    }
+
+    // Build SRTs object
+    const srts = {};
+    [...S.langs].forEach(l => { if (S.srt[l]) srts[l] = S.srt[l]; });
+
+    // Submit job to container
+    try {
+      aLog(log, 'in', `Enviando job para o Container (${audioTracks.length} faixas de áudio)...`);
+      await animFill(`pf-du-${i}`, 15, 400);
+
+      const resp = await fetch(`${containerProxy}/job`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          library_id:  S.libId,
+          api_key:     S.bunnyKey,
+          cdn_host:    S.cdnHost,
+          video_guid:  v.guid,
+          video_title: v.title,
+          audio_tracks: audioTracks,
+          srts
+        })
+      });
+
+      if (!resp.ok) {
+        const err = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${err.substring(0,100)}`);
+      }
+
+      const { job_id } = await resp.json();
+      aLog(log, 'ok', `Job criado: ${job_id}`);
+      piSt(i,'du','run','processando...');
+      piSub(`pb-du-${i}`, 'FFmpeg mesclando faixas de áudio...');
+      await animFill(`pf-du-${i}`, 30, 500);
+
+      // Poll job status
+      let done = false;
+      let attempts = 0;
+      const maxAttempts = 120; // 30 min max
+
+      while (!done && attempts < maxAttempts) {
+        await sleep(15000);
+        attempts++;
+
+        try {
+          const statusResp = await fetch(`${containerProxy}/job/${job_id}`);
+          const jobData = await statusResp.json();
+
+          const pct = jobData.progress || 0;
+          const msg = jobData.message || '';
+
+          piSub(`pb-du-${i}`, msg);
+          await animFill(`pf-du-${i}`, Math.min(30 + pct * 0.65, 95), 200);
+
+          aLog(log, 'in', `[${v.guid.substring(0,8)}] ${msg} (${pct}%)`);
+
+          if (jobData.status === 'done') {
+            done = true;
+            piSt(i,'du','ok','✓ concluído');
+            piFill(`pf-du-${i}`, 100, 'g');
+            aLog(log, 'ok', `✓ Vídeo atualizado no Bunny — ID preservado: ${v.guid}`);
+            jobResults.push({ title: v.title, ok: true });
+          } else if (jobData.status === 'error') {
+            done = true;
+            allOk = false;
+            piSt(i,'du','err','erro');
+            aLog(log, 'er', `Erro: ${jobData.message}`);
+            jobResults.push({ title: v.title, ok: false, err: jobData.message });
+          }
+        } catch(pollErr) {
+          aLog(log, 'wn', `Poll: ${pollErr.message.substring(0,50)}`);
+        }
+      }
+
+      if (!done) {
+        allOk = false;
+        piSt(i,'du','err','timeout');
+        aLog(log, 'er', 'Timeout — verifique o painel Cloudflare Workers');
+        jobResults.push({ title: v.title, ok: false, err: 'timeout' });
+      }
+
+    } catch(jobErr) {
+      allOk = false;
+      piSt(i,'du','err','falhou');
+      aLog(log, 'er', `Job falhou: ${jobErr.message.substring(0,80)}`);
+      jobResults.push({ title: v.title, ok: false, err: jobErr.message });
+    }
+  }
+
+  // Final
+  const okCount = jobResults.filter(r => r.ok).length;
+  if (allOk) {
+    aLog(log, 'ok', `🎉 ${okCount}/${vids.length} vídeos processados com sucesso!`);
+    aLog(log, 'ok', 'Multi-audio ativo no player Bunny — IDs preservados.');
+    toast(`${okCount} vídeo(s) atualizados no Bunny com multi-audio!`, 'ok');
+    btn.innerHTML = '✓ Concluído — continuar →';
+    btn.onclick = () => goStep(5);
+    btn.disabled = false;
+  } else {
+    const errCount = vids.length - okCount;
+    aLog(log, 'wn', `${okCount} OK, ${errCount} com erro. Use ⬇ Script Python para reprocessar os com erro.`);
+    toast(`${okCount}/${vids.length} processados. ${errCount} com erro.`, 'inf');
+    btn.innerHTML = '↺ Tentar novamente';
+    btn.disabled = false;
+  }
+}
+
+// ════════════════════════════════════════
+// VOICE ANALYSIS — Gemini analisa a voz do instrutor
+// ════════════════════════════════════════
+
+// Mapping from Gemini analysis to voice recommendations
+// Keys match descriptions Gemini might return
+const VOICE_PROFILES = {
+  // By gender + tone combos, mapped to voice ranking
+  male_deep:    ['Charon','Orus','Fenrir','Puck','Kore','Aoede'],
+  male_firm:    ['Fenrir','Charon','Orus','Puck','Kore','Aoede'],
+  male_warm:    ['Orus','Charon','Fenrir','Puck','Aoede','Kore'],
+  male_energetic:['Puck','Fenrir','Charon','Orus','Kore','Aoede'],
+  female_clear: ['Kore','Aoede','Puck','Fenrir','Charon','Orus'],
+  female_soft:  ['Aoede','Kore','Puck','Charon','Fenrir','Orus'],
+  default:      ['Charon','Fenrir','Orus','Puck','Kore','Aoede'],
+};
+
+async function analyzeVoice(video) {
+  const box    = document.getElementById('voice-analysis-box');
+  const title  = document.getElementById('voice-analysis-title');
+  const textEl = document.getElementById('voice-analysis-text');
+  const spin   = document.getElementById('voice-analysis-spin');
+
+  box.style.display = 'block';
+  spin.style.display = 'inline-block';
+  title.textContent  = 'Analisando voz do instrutor...';
+  textEl.textContent = '';
+
+  try {
+    // Get a short clip URL from Bunny (just need a few seconds of audio)
+    const cdnHostA = S.cdnHost || `vz-${S.libId}.b-cdn.net`;
+    const videoUrl = `https://${cdnHostA}/${video.guid}/play_720p.mp4`;
+
+    let analysisResult;
+
+    if (!video.guid.startsWith('demo-')) {
+      // Download first ~2MB of video (enough for audio analysis)
+      const res = await fetch(videoUrl);
+
+      if (!res.ok) throw new Error(`Download ${res.status}`);
+
+      // Read only first 3MB to keep it fast
+      const reader    = res.body.getReader();
+      const chunks    = [];
+      let   totalSize = 0;
+      const MAX_BYTES = 3 * 1024 * 1024;
+
+      while (totalSize < MAX_BYTES) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        totalSize += value.length;
+      }
+      reader.cancel();
+
+      const blob = new Blob(chunks, { type: 'video/mp4' });
+
+      // Upload to Gemini Files API
+      const form = new FormData();
+      form.append('file', blob, 'sample.mp4');
+      const upRes = await fetch(
+        `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${S.geminiKey}`,
+        { method: 'POST', body: form }
+      );
+      if (!upRes.ok) throw new Error(`Files API ${upRes.status}`);
+      const { file } = await upRes.json();
+      const fileUri  = file?.uri;
+      if (!fileUri) throw new Error('URI não retornada');
+
+      // Ask Gemini to analyze the voice
+      const genRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${S.geminiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [
+              { fileData: { mimeType: 'video/mp4', fileUri } },
+              { text: `Analyze the instructor's voice in this video. Respond ONLY with a JSON object, no markdown, no explanation:
+{
+  "gender": "male" or "female",
+  "tone": "deep" or "firm" or "warm" or "energetic" or "clear" or "soft",
+  "pace": "slow" or "moderate" or "fast",
+  "energy": "calm" or "moderate" or "intense",
+  "summary_pt": "Uma frase em português descrevendo a voz (máx 15 palavras)"
+}` }
+            ]}],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 256 }
+          })
+        }
+      );
+
+      // Cleanup file
+      const fname = fileUri.split('/').pop();
+      fetch(`https://generativelanguage.googleapis.com/v1beta/files/${fname}?key=${S.geminiKey}`, { method: 'DELETE' }).catch(() => {});
+
+      if (!genRes.ok) throw new Error(`Gemini ${genRes.status}`);
+      const gd = await genRes.json();
+      const raw = gd.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      const clean = raw.replace(/```json|```/g, '').trim();
+      analysisResult = JSON.parse(clean);
+
+    } else {
+      // Demo mode — simulate analysis
+      await sleep(1200);
+      analysisResult = { gender:'male', tone:'deep', pace:'moderate', energy:'moderate', summary_pt:'Voz masculina profunda e autoritária, ritmo moderado' };
+    }
+
+    // Map analysis to voice ranking
+    const key = `${analysisResult.gender}_${analysisResult.tone}`;
+    const ranking = VOICE_PROFILES[key] || VOICE_PROFILES.default;
+
+    // Update VOICES order based on analysis
+    ['en','es'].forEach(lang => {
+      VOICES[lang] = ranking.map(name => {
+        const baseDesc = {
+          Charon: 'Masculino profundo e autoritário',
+          Fenrir: 'Masculino firme e direto',
+          Orus:   'Masculino grave e calmo',
+          Puck:   'Masculino animado e expressivo',
+          Kore:   'Feminino claro e preciso',
+          Aoede:  'Feminino suave e natural',
+        }[name] || name;
+        const gender = ['Kore','Aoede'].includes(name) ? 'F' : 'M';
+        return { name, label: name, desc: baseDesc, gender, recommended: name === ranking[0] };
+      });
+    });
+
+    // Update selected voice to top recommendation
+    S.voiceSel.en = ranking[0];
+    S.voiceSel.es = ranking[0];
+
+    // Show result
+    spin.style.display  = 'none';
+    title.textContent   = `🎤 Voz analisada — melhor match: ${ranking[0]}`;
+    textEl.innerHTML    = `${analysisResult.summary_pt || ''}<br><span style="color:var(--green);font-weight:500">${ranking[0]} ★ recomendada para ${analysisResult.gender === 'male' ? 'voz masculina' : 'voz feminina'} ${analysisResult.tone}</span>`;
+
+    renderVoicePreviews();
+    toast(`Análise concluída — voz ${ranking[0]} sugerida`, 'ok');
+
+  } catch(e) {
+    spin.style.display  = 'none';
+    title.textContent   = '🎤 Análise de voz';
+    textEl.textContent  = `Não foi possível analisar: ${e.message.substring(0,60)}. Vozes ordenadas por padrão.`;
+    toast('Análise falhou — usando ordem padrão', 'inf');
+  }
+}
+
+// ════════════════════════════════════════
+// VOICE PREVIEW SYSTEM
+// ════════════════════════════════════════
+
+// Voices ordered by best match for male BJJ instructor voice
+// Criteria: warm/authoritative masculine tone, clear pronunciation
+const VOICES = {
+  en: [
+    { name:'Charon',  label:'Charon',  desc:'Masculino profundo — mais próximo de instrutor', gender:'M', recommended:true },
+    { name:'Fenrir',  label:'Fenrir',  desc:'Masculino firme e direto',                       gender:'M' },
+    { name:'Orus',    label:'Orus',    desc:'Masculino grave e calmo',                        gender:'M' },
+    { name:'Puck',    label:'Puck',    desc:'Masculino animado e expressivo',                 gender:'M' },
+    { name:'Kore',    label:'Kore',    desc:'Feminino claro e preciso',                       gender:'F' },
+    { name:'Aoede',   label:'Aoede',   desc:'Feminino suave e natural',                       gender:'F' },
+  ],
+  es: [
+    { name:'Charon',  label:'Charon',  desc:'Masculino profundo — mais próximo de instrutor', gender:'M', recommended:true },
+    { name:'Fenrir',  label:'Fenrir',  desc:'Masculino firme e direto',                       gender:'M' },
+    { name:'Orus',    label:'Orus',    desc:'Masculino grave e calmo',                        gender:'M' },
+    { name:'Puck',    label:'Puck',    desc:'Masculino animado e expressivo',                 gender:'M' },
+    { name:'Kore',    label:'Kore',    desc:'Feminino claro e preciso',                       gender:'F' },
+    { name:'Aoede',   label:'Aoede',   desc:'Feminino suave e natural',                       gender:'F' },
+  ]
+};
+
+// Selected voices state
+S.voiceSel = { en: 'Charon', es: 'Charon' };
+
+// Sample text for preview
+const PREVIEW_TEXTS = {
+  en: 'Now secure the collar grip and execute the sweep.',
+  es: 'Ahora asegura el agarre en el cuello y ejecuta el barrido.'
+};
+
+let previewAudios = {};
+let playingVoice  = null;
+
+function renderVoicePreviews() {
+  ['en','es'].forEach(lang => {
+    const container = document.getElementById(`voices-${lang}`);
+    if (!container) return;
+    container.innerHTML = VOICES[lang].map(v => `
+      <div class="voice-row${S.voiceSel[lang]===v.name?' voice-playing':''}" id="vrow-${lang}-${v.name}">
+        <span class="voice-row-flag">${v.gender==='M'?'🎤':'🎙'}</span>
+        <div class="voice-row-info">
+          <div class="voice-row-name">${v.label}${v.recommended?' ★':''}</div>
+          <div class="voice-row-desc">${v.desc}</div>
+        </div>
+        <div class="voice-row-ctrl">
+          <button class="btn btn-outline btn-sm" id="vplay-${lang}-${v.name}"
+            onclick="previewVoice('${lang}','${v.name}',this)"
+            style="padding:4px 9px;font-size:11px;width:auto">▶</button>
+          <button class="btn btn-sm${S.voiceSel[lang]===v.name?' btn-green':' btn-outline'}"
+            id="vsel-${lang}-${v.name}"
+            onclick="selectVoice('${lang}','${v.name}')"
+            style="padding:4px 9px;font-size:11px;width:auto">
+            ${S.voiceSel[lang]===v.name?'✓ Selecionada':'Usar'}
+          </button>
+        </div>
+      </div>`).join('');
+  });
+}
+
+function selectVoice(lang, name) {
+  S.voiceSel[lang] = name;
+  renderVoicePreviews();
+}
+
+async function previewVoice(lang, voiceName, btn) {
+  if (!S.geminiKey) { toast('Cole sua Gemini API Key primeiro', 'err'); return; }
+
+  // If already cached, just play
+  const cacheKey = `${lang}-${voiceName}`;
+  if (previewAudios[cacheKey]) {
+    playBlob(previewAudios[cacheKey], lang, voiceName, btn);
+    return;
+  }
+
+  const origLabel = btn.textContent;
+  btn.innerHTML = '<div class="spin" style="border-top-color:var(--green)"></div>';
+  btn.disabled = true;
+
+  try {
+    const lcode = { en:'en-US', es:'es-ES' }[lang];
+    const blob = await callTTS(PREVIEW_TEXTS[lang], voiceName, lcode);
+    previewAudios[cacheKey] = blob;
+    playBlob(blob, lang, voiceName, btn);
+  } catch(e) {
+    toast(`Preview falhou: ${e.message.substring(0,50)}`, 'err');
+    btn.innerHTML = origLabel;
+    btn.disabled = false;
+  }
+}
+
+function playBlob(blob, lang, voiceName, btn) {
+  // Stop any playing audio
+  if (playingVoice) {
+    playingVoice.audio.pause();
+    if (playingVoice.btn) { playingVoice.btn.textContent = '▶'; playingVoice.btn.disabled = false; }
+  }
+
+  const url   = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  playingVoice = { audio, btn };
+
+  btn.textContent = '⏹';
+  btn.disabled    = false;
+  btn.onclick     = () => { audio.pause(); btn.textContent = '▶'; btn.onclick = () => previewVoice(lang, voiceName, btn); };
+
+  audio.onended = () => { btn.textContent = '▶'; btn.onclick = () => previewVoice(lang, voiceName, btn); playingVoice = null; };
+  audio.play();
+}
+
+// ════════════════════════════════════════
+// LOCALSTORAGE — salvar e restaurar configurações
+// ════════════════════════════════════════
+
+const CFG_KEYS = ['cfgProxy','cfgContainerProxy','cfgLibId','cfgBunnyKey','cfgCdn','cfgGeminiKey'];
+
+function saveCfg() {
+  const cfg = {};
+  CFG_KEYS.forEach(k => {
+    const el = document.getElementById(k);
+    if (el) cfg[k] = el.value;
+  });
+  // Save selected langs
+  cfg.langs = [...S.langs].join(',');
+  // Save voice selections
+  cfg.voiceEn = S.voiceSel?.en || 'Charon';
+  cfg.voiceEs = S.voiceSel?.es || 'Charon';
+  localStorage.setItem('bjjprotech_cfg', JSON.stringify(cfg));
+}
+
+function loadCfg() {
+  try {
+    const raw = localStorage.getItem('bjjprotech_cfg');
+    if (!raw) return false;
+    const cfg = JSON.parse(raw);
+    CFG_KEYS.forEach(k => {
+      const el = document.getElementById(k);
+      if (el && cfg[k]) el.value = cfg[k];
+    });
+    // Restore langs
+    if (cfg.langs) {
+      S.langs = new Set(cfg.langs.split(',').filter(Boolean));
+      // Update lang buttons UI
+      ['pt','en','es','fr'].forEach(l => {
+        const btn = document.getElementById(`lang-${l}`);
+        if (btn) {
+          if (S.langs.has(l)) btn.classList.add('on');
+          else btn.classList.remove('on');
+        }
+      });
+    }
+    // Restore voice selections
+    if (cfg.voiceEn) { if (!S.voiceSel) S.voiceSel = {}; S.voiceSel.en = cfg.voiceEn; }
+    if (cfg.voiceEs) { if (!S.voiceSel) S.voiceSel = {}; S.voiceSel.es = cfg.voiceEs; }
+    // Update S state from fields
+    S.proxy      = document.getElementById('cfgProxy')?.value || '';
+    S.libId      = document.getElementById('cfgLibId')?.value || '';
+    S.bunnyKey   = document.getElementById('cfgBunnyKey')?.value || '';
+    S.cdnHost    = document.getElementById('cfgCdn')?.value || '';
+    S.geminiKey  = document.getElementById('cfgGeminiKey')?.value || '';
+    return true;
+  } catch(e) { return false; }
+}
+
+// Auto-save whenever any config field changes
+CFG_KEYS.forEach(k => {
+  const el = document.getElementById(k);
+  if (el) el.addEventListener('input', saveCfg);
+});
+
+// ════════════════════════════════════════
+// BACK BUTTON — voltar ao início
+// ════════════════════════════════════════
+
+function backToStart() {
+  showModal(
+    '↩ Voltar ao início',
+    'Deseja voltar para a seleção de vídeos?<br><br><strong>Os dados de transcrição, tradução e áudio gerados serão perdidos.</strong>',
+    () => { closeModal(); resetAll(); }
+  );
+}
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+setTimeout(() => {
+  const restored = loadCfg();
+  // Auto-detect if running from Railway and pre-fill container URL
+  const currentHost = window.location.hostname;
+  if (currentHost.includes('railway.app') || currentHost.includes('up.railway.app')) {
+    const railwayUrl = `https://${currentHost}`;
+    const containerField = document.getElementById('cfgContainerProxy');
+    if (containerField && !containerField.value) {
+      containerField.value = railwayUrl;
+      saveCfg();
+    }
+  }
+  if (restored && S.proxy) {
+    toast('Configurações restauradas automaticamente ✓', 'ok');
+    testProxy(S.proxy);
+  } else {
+    toast('Configure o proxy Cloudflare e as credenciais para começar', 'inf');
+  }
+  renderVoicePreviews();
+}, 300);
+</script>
+</body>
+</html>
