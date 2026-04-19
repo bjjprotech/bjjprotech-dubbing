@@ -118,22 +118,39 @@ def process_job(job_id, payload):
             for track in audio_tracks:
                 lang     = track['lang']
                 wav_data = base64.b64decode(track['wav_b64'])
-                raw_path = tmp / f'dub_{lang}_raw.wav'
+                raw_path = tmp / f'dub_{lang}_raw.bin'
                 raw_path.write_bytes(wav_data)
-                # Convert to standard PCM WAV that FFmpeg accepts reliably
+                log(f"  WAV {lang.upper()} raw: {len(wav_data)//1024}KB, magic: {wav_data[:4]}")
+
                 conv_path = tmp / f'dub_{lang}.wav'
-                conv_result = subprocess.run([
+
+                # Try 1: treat as WAV file directly
+                conv1 = subprocess.run([
                     'ffmpeg', '-y', '-i', str(raw_path),
                     '-ar', '44100', '-ac', '1', '-c:a', 'pcm_s16le',
                     str(conv_path)
                 ], capture_output=True, text=True)
-                if conv_result.returncode == 0:
+
+                if conv1.returncode == 0:
                     wav_paths[lang] = conv_path
-                    log(f"  WAV {lang.upper()}: {conv_path.stat().st_size//1024}KB (convertido)")
+                    log(f"  WAV {lang.upper()}: {conv_path.stat().st_size//1024}KB (convertido de WAV)")
                 else:
-                    # Use raw if conversion fails
-                    wav_paths[lang] = raw_path
-                    log(f"  WAV {lang.upper()}: {len(wav_data)//1024}KB (raw)")
+                    # Try 2: treat as raw PCM 16-bit 24000Hz (Gemini TTS format)
+                    log(f"  Tentando como PCM raw 24kHz...")
+                    conv2 = subprocess.run([
+                        'ffmpeg', '-y',
+                        '-f', 's16le', '-ar', '24000', '-ac', '1',
+                        '-i', str(raw_path),
+                        '-ar', '44100', '-ac', '1', '-c:a', 'pcm_s16le',
+                        str(conv_path)
+                    ], capture_output=True, text=True)
+
+                    if conv2.returncode == 0:
+                        wav_paths[lang] = conv_path
+                        log(f"  WAV {lang.upper()}: {conv_path.stat().st_size//1024}KB (convertido de PCM raw)")
+                    else:
+                        log(f"  ERRO conversão WAV: {conv2.stderr[-200:]}")
+                        raise RuntimeError(f"Não foi possível converter áudio {lang}: {conv2.stderr[-150:]}")
 
             # 3. FFmpeg
             update_job(job_id, progress=45, message='Mesclando faixas com FFmpeg...')
