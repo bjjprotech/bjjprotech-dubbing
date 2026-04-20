@@ -223,24 +223,42 @@ def process_job(job_id, payload):
             lang_order  = [t['lang'] for t in audio_tracks]
             lang_labels = {t['lang']: t['label'] for t in audio_tracks}
 
-            cmd = ['ffmpeg', '-y', '-i', str(orig_path)]
+            LANG_ISO = {'pt':'por','en':'eng','es':'spa','fr':'fra'}
+
+            cmd = ['ffmpeg', '-y']
+            # Input: vídeo original
+            cmd += ['-i', str(orig_path)]
+            # Inputs: WAVs dublados
             for lang in lang_order:
                 cmd += ['-i', str(wav_paths[lang])]
-            cmd += ['-map', '0:v', '-map', '0:a']
+
+            # Mapear vídeo e todas as faixas de áudio
+            cmd += ['-map', '0:v']   # vídeo original
+            cmd += ['-map', '0:a']   # áudio PT-BR original
+
             for i in range(len(lang_order)):
                 cmd += ['-map', f'{i+1}:a']
 
-            LANG_ISO = {'pt':'por','en':'eng','es':'spa','fr':'fra'}
-            cmd += ['-metadata:s:a:0','language=por','-metadata:s:a:0','title=Português']
+            # Metadados de idioma
+            cmd += ['-metadata:s:a:0', 'language=por']
+            cmd += ['-metadata:s:a:0', 'title=Português (Brasil)']
             for idx, lang in enumerate(lang_order, 1):
                 iso   = LANG_ISO.get(lang, lang)
                 label = lang_labels.get(lang, lang.upper())
                 cmd += [f'-metadata:s:a:{idx}', f'language={iso}']
                 cmd += [f'-metadata:s:a:{idx}', f'title={label}']
 
-            cmd += ['-c:v','copy','-c:a:0','copy']
+            # IMPORTANTE: re-encoda tudo para AAC para garantir sincronização correta
+            # Usar copy no áudio original pode causar drift após re-encoding do Bunny
+            cmd += ['-c:v', 'copy']           # vídeo sem re-encoding
+            cmd += ['-c:a:0', 'aac', '-b:a:0', '192k']  # PT-BR re-encodado para AAC 192k
             for i in range(len(lang_order)):
-                cmd += [f'-c:a:{i+1}','aac',f'-b:a:{i+1}','128k']
+                cmd += [f'-c:a:{i+1}', 'aac', f'-b:a:{i+1}', '128k']
+
+            # Garantir sincronização de áudio com vídeo
+            cmd += ['-async', '1']            # corrige drift de áudio
+            cmd += ['-vsync', '1']            # sincronização de vídeo
+
             cmd.append(str(merged_path))
 
             log(f"  FFmpeg iniciando...")
