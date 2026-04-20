@@ -369,19 +369,24 @@ body{background:var(--bg);color:var(--text);font-family:'Literata',serif;font-si
         <div id="voice-analysis-text" style="color:var(--text2)"></div>
       </div>
 
-      <p style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:10px;line-height:1.5">Selecione um vídeo e a IA analisa a voz do instrutor para sugerir as melhores vozes. Clique ▶ para ouvir amostras.</p>
-
-      <div style="margin-bottom:10px">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">🇺🇸 Inglês (EN-US)</div>
-        <div class="voice-preview-grid" id="voices-en"></div>
+      <!-- Estado antes da análise -->
+      <div id="voice-pending" style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:12px;text-align:center;margin-bottom:10px">
+        <div style="font-size:22px;margin-bottom:6px;opacity:.3">🎤</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text3);line-height:1.6">Selecione um vídeo na biblioteca para a IA analisar a voz do instrutor e sugerir as vozes mais próximas.</div>
       </div>
 
-      <div>
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">🇪🇸 Espanhol (ES-ES)</div>
-        <div class="voice-preview-grid" id="voices-es"></div>
+      <!-- Vozes (aparecem após análise) -->
+      <div id="voice-lists" style="display:none">
+        <div style="margin-bottom:10px">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">🇺🇸 Inglês (EN-US)</div>
+          <div class="voice-preview-grid" id="voices-en"></div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">🇪🇸 Espanhol (ES-ES)</div>
+          <div class="voice-preview-grid" id="voices-es"></div>
+        </div>
+        <p style="font-size:11px;color:var(--text3);margin-top:10px;font-family:var(--mono);line-height:1.5">⚠️ Voz não clona o instrutor — é pré-definida pelo Google.</p>
       </div>
-
-      <p style="font-size:11px;color:var(--text3);margin-top:10px;font-family:var(--mono);line-height:1.5">⚠️ Voz não clona o instrutor — é pré-definida pelo Google.</p>
     </div>
 
     <!-- OPÇÕES -->
@@ -2133,6 +2138,12 @@ let previewAudios = {};
 let playingVoice  = null;
 
 function renderVoicePreviews() {
+  // Show voice lists, hide pending message
+  const pending = document.getElementById('voice-pending');
+  const lists   = document.getElementById('voice-lists');
+  if (pending) pending.style.display = 'none';
+  if (lists)   lists.style.display   = 'block';
+
   ['en','es'].forEach(lang => {
     const container = document.getElementById(`voices-${lang}`);
     if (!container) return;
