@@ -410,17 +410,17 @@ body{background:var(--bg);color:var(--text);font-family:'Literata',serif;font-si
     <!-- PIPELINE -->
     <div class="pipe">
       <button class="btn btn-outline btn-sm" id="btn-back" onclick="backToStart()" style="width:auto;padding:4px 10px;font-size:11px;flex-shrink:0;display:none">↩ Início</button>
-      <div class="ps active" id="ps-1"><div class="pn">1</div>Selecionar</div>
+      <div class="ps active" id="ps-1" onclick="navStep(1)" style="cursor:pointer" title="Ir para Seleção"><div class="pn">1</div>Selecionar</div>
       <div class="pa">›</div>
-      <div class="ps" id="ps-2"><div class="pn">2</div>Transcrição</div>
+      <div class="ps" id="ps-2" onclick="navStep(2)" style="cursor:pointer" title="Ver Transcrição"><div class="pn">2</div>Transcrição</div>
       <div class="pa">›</div>
-      <div class="ps" id="ps-3"><div class="pn">3</div>Tradução</div>
+      <div class="ps" id="ps-3" onclick="navStep(3)" style="cursor:pointer" title="Ver Tradução"><div class="pn">3</div>Tradução</div>
       <div class="pa">›</div>
-      <div class="ps" id="ps-4"><div class="pn">4</div>Dublagem TTS</div>
+      <div class="ps" id="ps-4" onclick="navStep(4)" style="cursor:pointer" title="Ver Dublagem"><div class="pn">4</div>Dublagem TTS</div>
       <div class="pa">›</div>
-      <div class="ps" id="ps-5"><div class="pn">5</div>Upload Bunny</div>
+      <div class="ps" id="ps-5" onclick="navStep(5)" style="cursor:pointer" title="Ver Upload"><div class="pn">5</div>Upload Bunny</div>
       <div class="pa">›</div>
-      <div class="ps" id="ps-6"><div class="pn">6</div>Concluído</div>
+      <div class="ps" id="ps-6" onclick="navStep(6)" style="cursor:pointer" title="Ver Conclusão"><div class="pn">6</div>Concluído</div>
     </div>
 
     <div class="content">
@@ -771,6 +771,9 @@ function updateStats() {
 // ════════════════════════════════════════
 // PIPELINE
 // ════════════════════════════════════════
+// Store full logs for report
+S.fullLog = S.fullLog || [];
+
 function goStep(n) {
   S.step = n;
   for (let i = 1; i <= 6; i++) {
@@ -778,7 +781,6 @@ function goStep(n) {
     const sec = document.getElementById(`sec-${i}`);
     sec.className = 'section' + (i === n ? ' active' : '');
   }
-  // Show back button when not on step 1
   const backBtn = document.getElementById('btn-back');
   if (backBtn) backBtn.style.display = n > 1 ? 'inline-flex' : 'none';
   if (n === 3) startTranslation();
@@ -786,11 +788,68 @@ function goStep(n) {
   if (n === 5) startUpload();
 }
 
+function navStep(n) {
+  // Only navigate to steps that have been reached
+  if (n > S.step && n !== S.step) {
+    toast(`Etapa ${n} ainda não foi processada`, 'inf');
+    return;
+  }
+  // Just switch view without re-running
+  for (let i = 1; i <= 6; i++) {
+    const ps = document.getElementById(`ps-${i}`);
+    const sec = document.getElementById(`sec-${i}`);
+    if (ps) ps.className = 'ps' + (i < S.step ? ' done' : i === S.step ? ' active' : '');
+    if (sec) sec.className = 'section' + (i === n ? ' active' : '');
+  }
+  // Mark viewed step visually
+  const psN = document.getElementById(`ps-${n}`);
+  if (psN && n !== S.step) psN.style.outline = '2px solid var(--accent)';
+  setTimeout(() => { if (psN) psN.style.outline = ''; }, 1000);
+}
+
+// ════════════════════════════════════════
+// VOICE CONFIRMATION BEFORE PIPELINE
+// ════════════════════════════════════════
+function showVoiceConfirmation() {
+  // If voice analysis already done and voices are shown, go straight to pipeline
+  const voiceLists = document.getElementById('voice-lists');
+  const alreadyAnalyzed = voiceLists && voiceLists.style.display !== 'none';
+
+  if (!alreadyAnalyzed) {
+    // No analysis yet — ask if wants to proceed with default voices
+    showModal(
+      '🎤 Configurar Vozes',
+      `As vozes ainda não foram analisadas para este vídeo.<br><br>
+       <strong>Opção A:</strong> Aguardar análise automática de voz (recomendado — a IA analisa o instrutor e sugere a voz mais próxima)<br><br>
+       <strong>Opção B:</strong> Usar voz padrão <strong>Charon</strong> e iniciar agora`,
+      () => { closeModal(); S.startTs = Date.now(); runFullPipeline(); },
+      'Iniciar com Charon'
+    );
+    // Also scroll to voice section
+    document.querySelector('.sb-blk:last-of-type')?.scrollIntoView({behavior:'smooth'});
+    return;
+  }
+
+  // Voices already shown — confirm selection and go
+  const voiceEn = S.voiceSel?.en || 'Charon';
+  const voiceEs = S.voiceSel?.es || 'Charon';
+  showModal(
+    '🎤 Confirmar Vozes',
+    `Vozes selecionadas:<br><br>
+     🇺🇸 <strong>Inglês:</strong> ${voiceEn}<br>
+     🇪🇸 <strong>Espanhol:</strong> ${voiceEs}<br><br>
+     Clique em ▶ na barra lateral para ouvir amostras antes de confirmar.`,
+    () => { closeModal(); S.startTs = Date.now(); runFullPipeline(); },
+    'Confirmar e Iniciar'
+  );
+}
+
 // ════════════════════════════════════════
 // FULL AUTO PIPELINE — roda tudo sem interrupção
 // ════════════════════════════════════════
 async function runFullPipeline() {
   S.pipelineRunning = true;
+  S.fullLog = []; // Reset log for new pipeline run
   const log = document.getElementById('log-t');
 
   try {
@@ -851,7 +910,7 @@ function confirmStart() {
      • Etapa 5 — Upload SRT: grátis<br><br>
      <strong>Custo total estimado: ~$${(parseFloat(ct)+parseFloat(cd)).toFixed(2)}</strong><br>
      <strong>IDs preservados — links da plataforma intactos.</strong>`,
-    () => { closeModal(); S.startTs = Date.now(); runFullPipeline(); }
+    () => { closeModal(); showVoiceConfirmation(); }
   );
 }
 
@@ -1354,10 +1413,36 @@ function dl(blob, name) { const a=document.createElement('a'); a.href=URL.create
 
 function dlReport() {
   const vids = S.videos.filter(v => S.sel.has(v.guid));
-  const lines = ['BJJ PRO TECH — RELATÓRIO DE LOCALIZAÇÃO',`Data: ${new Date().toLocaleString('pt-BR')}`,`Tempo: ${fmtElapsed(S.startTs)}`,'',
-    'STACK:','  Transcrição: Gemini 2.5 Flash (Files API)','  Tradução: Gemini 2.5 Flash','  Dublagem: Gemini TTS Flash','  Upload: Bunny Stream API (captions)',
-    '',`VÍDEOS (${vids.length}):`, ...vids.map(v=>`  • ${v.title} — ${fmtDur(v.length)} — ID: ${v.guid}`),
-    '',`IDIOMAS: ${[...S.langs].join(', ').toUpperCase()}`,'','STATUS: ✅ CONCLUÍDO','IDs preservados.'];
+  const lines = [
+    '╔══════════════════════════════════════════════════════╗',
+    '║   BJJ PRO TECH — RELATÓRIO COMPLETO DE LOCALIZAÇÃO  ║',
+    '╚══════════════════════════════════════════════════════╝',
+    '',
+    `Data: ${new Date().toLocaleString('pt-BR')}`,
+    `Tempo total: ${fmtElapsed(S.startTs)}`,
+    '',
+    '── VÍDEOS PROCESSADOS ──────────────────────────────────',
+    ...vids.map(v=>`  • ${v.title}`),
+    `  Total: ${vids.length} vídeo(s)`,
+    '',
+    '── IDIOMAS ─────────────────────────────────────────────',
+    `  ${[...S.langs].join(', ').toUpperCase()}`,
+    '',
+    '── STACK ───────────────────────────────────────────────',
+    '  Transcrição: Gemini 2.5 Flash (Files API)',
+    '  Tradução:    Gemini 2.5 Flash',
+    '  Dublagem:    Gemini 3.1 Flash TTS',
+    '  Merge/Upload: Railway (FFmpeg) + Bunny Fetch API',
+    '  Legendas:    Bunny Stream API',
+    '',
+    '── STATUS ──────────────────────────────────────────────',
+    '  ✅ CONCLUÍDO — IDs preservados',
+    '',
+    '── LOG COMPLETO DE EXECUÇÃO ────────────────────────────',
+    ...(S.fullLog || ['  (sem log disponível)']),
+    '',
+    '════════════════════════════════════════════════════════',
+  ];
   dl(new Blob([lines.join('\n')],{type:'text/plain'}), `bjjprotech_report_${Date.now()}.txt`);
 }
 
