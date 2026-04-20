@@ -2299,14 +2299,56 @@ async function previewVoice(lang, voiceName, btn) {
   }
 }
 
-function playBlob(blob, lang, voiceName, btn) {
+async function playBlob(blob, lang, voiceName, btn) {
   // Stop any playing audio
   if (playingVoice) {
     playingVoice.audio.pause();
     if (playingVoice.btn) { playingVoice.btn.textContent = '▶'; playingVoice.btn.disabled = false; }
   }
 
-  const url   = URL.createObjectURL(blob);
+  // Ensure proper WAV format — Gemini returns PCM raw, need valid WAV header
+  let playBlob = blob;
+  try {
+    const arrayBuf = await blob.arrayBuffer();
+    const view = new DataView(arrayBuf);
+    const magic = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3));
+    
+    if (magic !== 'RIFF') {
+      // PCM raw — wrap in WAV header (24kHz, 16-bit, mono — Gemini TTS format)
+      const pcmData   = new Uint8Array(arrayBuf);
+      const wavHeader = new ArrayBuffer(44);
+      const hv        = new DataView(wavHeader);
+      const numChannels = 1, sampleRate = 24000, bitsPerSample = 16;
+      const byteRate  = sampleRate * numChannels * bitsPerSample / 8;
+      const blockAlign= numChannels * bitsPerSample / 8;
+      // RIFF chunk
+      hv.setUint8(0,  0x52); hv.setUint8(1,  0x49); hv.setUint8(2,  0x46); hv.setUint8(3,  0x46); // "RIFF"
+      hv.setUint32(4,  36 + pcmData.length, true); // ChunkSize
+      hv.setUint8(8,  0x57); hv.setUint8(9,  0x41); hv.setUint8(10, 0x56); hv.setUint8(11, 0x45); // "WAVE"
+      // fmt chunk
+      hv.setUint8(12, 0x66); hv.setUint8(13, 0x6D); hv.setUint8(14, 0x74); hv.setUint8(15, 0x20); // "fmt "
+      hv.setUint32(16, 16, true);           // Subchunk1Size
+      hv.setUint16(20, 1, true);            // AudioFormat PCM
+      hv.setUint16(22, numChannels, true);
+      hv.setUint32(24, sampleRate, true);
+      hv.setUint32(28, byteRate, true);
+      hv.setUint16(32, blockAlign, true);
+      hv.setUint16(34, bitsPerSample, true);
+      // data chunk
+      hv.setUint8(36, 0x64); hv.setUint8(37, 0x61); hv.setUint8(38, 0x74); hv.setUint8(39, 0x61); // "data"
+      hv.setUint32(40, pcmData.length, true);
+      
+      const wavArray = new Uint8Array(44 + pcmData.length);
+      wavArray.set(new Uint8Array(wavHeader), 0);
+      wavArray.set(pcmData, 44);
+      playBlob = new Blob([wavArray], { type: 'audio/wav' });
+    }
+  } catch(e) {
+    // Use original blob if conversion fails
+    playBlob = blob;
+  }
+
+  const url   = URL.createObjectURL(playBlob);
   const audio = new Audio(url);
   playingVoice = { audio, btn };
 
@@ -2314,8 +2356,15 @@ function playBlob(blob, lang, voiceName, btn) {
   btn.disabled    = false;
   btn.onclick     = () => { audio.pause(); btn.textContent = '▶'; btn.onclick = () => previewVoice(lang, voiceName, btn); };
 
+  audio.onerror = (e) => { 
+    toast('Não foi possível reproduzir — tente outro formato', 'err');
+    btn.textContent = '▶'; btn.disabled = false; playingVoice = null;
+  };
   audio.onended = () => { btn.textContent = '▶'; btn.onclick = () => previewVoice(lang, voiceName, btn); playingVoice = null; };
-  audio.play();
+  audio.play().catch(e => {
+    toast(`Erro ao reproduzir: ${e.message.substring(0,40)}`, 'err');
+    btn.textContent = '▶'; btn.disabled = false;
+  });
 }
 
 // ════════════════════════════════════════
