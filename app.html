@@ -2298,12 +2298,11 @@ setTimeout(() => {
   const restored = loadCfg();
   if (restored && S.proxy) {
     toast('Configurações restauradas automaticamente ✓', 'ok');
-    // Auto-test proxy
     testProxy(S.proxy);
   } else {
     toast('Configure o proxy Cloudflare e as credenciais para começar', 'inf');
   }
-  renderVoicePreviews();
+  // Vozes só aparecem após selecionar um vídeo
 }, 300);
 </script>
 </body>
