@@ -228,13 +228,13 @@ def process_job(job_id, payload):
             cmd = ['ffmpeg', '-y']
             # Input: vídeo original
             cmd += ['-i', str(orig_path)]
-            # Inputs: WAVs dublados
+            # Inputs: WAVs dublados (já convertidos para PCM 44100Hz)
             for lang in lang_order:
                 cmd += ['-i', str(wav_paths[lang])]
 
             # Mapear vídeo e todas as faixas de áudio
-            cmd += ['-map', '0:v']   # vídeo original
-            cmd += ['-map', '0:a']   # áudio PT-BR original
+            cmd += ['-map', '0:v']   # vídeo original — copiado sem alteração
+            cmd += ['-map', '0:a']   # áudio PT-BR original — copiado sem alteração
 
             for i in range(len(lang_order)):
                 cmd += ['-map', f'{i+1}:a']
@@ -248,16 +248,14 @@ def process_job(job_id, payload):
                 cmd += [f'-metadata:s:a:{idx}', f'language={iso}']
                 cmd += [f'-metadata:s:a:{idx}', f'title={label}']
 
-            # IMPORTANTE: re-encoda tudo para AAC para garantir sincronização correta
-            # Usar copy no áudio original pode causar drift após re-encoding do Bunny
-            cmd += ['-c:v', 'copy']           # vídeo sem re-encoding
-            cmd += ['-c:a:0', 'aac', '-b:a:0', '192k']  # PT-BR re-encodado para AAC 192k
+            # GARANTIA DE QUALIDADE:
+            # -c:v copy   → vídeo copiado bit a bit, zero perda de qualidade
+            # -c:a:0 copy → áudio PT-BR original copiado bit a bit, zero alteração
+            # Faixas EN/ES convertidas para AAC 128k (qualidade adequada para dublagem)
+            cmd += ['-c:v', 'copy']      # vídeo intocado
+            cmd += ['-c:a:0', 'copy']    # áudio PT-BR intocado
             for i in range(len(lang_order)):
                 cmd += [f'-c:a:{i+1}', 'aac', f'-b:a:{i+1}', '128k']
-
-            # Garantir sincronização de áudio com vídeo
-            cmd += ['-async', '1']            # corrige drift de áudio
-            cmd += ['-vsync', '1']            # sincronização de vídeo
 
             cmd.append(str(merged_path))
 
