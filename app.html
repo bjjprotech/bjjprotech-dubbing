@@ -2073,16 +2073,14 @@ async function analyzeVoice(video) {
     let analysisResult;
 
     if (!video.guid.startsWith('demo-')) {
-      // Download first ~2MB of video (enough for audio analysis)
+      // Download first 10MB — enough to contain audio data in the MP4
       const res = await fetch(videoUrl);
-
       if (!res.ok) throw new Error(`Download ${res.status}`);
 
-      // Read only first 3MB to keep it fast
       const reader    = res.body.getReader();
       const chunks    = [];
       let   totalSize = 0;
-      const MAX_BYTES = 3 * 1024 * 1024;
+      const MAX_BYTES = 10 * 1024 * 1024; // 10MB para garantir audio
 
       while (totalSize < MAX_BYTES) {
         const { done, value } = await reader.read();
@@ -2093,6 +2091,7 @@ async function analyzeVoice(video) {
       reader.cancel();
 
       const blob = new Blob(chunks, { type: 'video/mp4' });
+      title.textContent = `Enviando amostra (${(blob.size/1024/1024).toFixed(1)}MB)...`;
 
       // Upload to Gemini Files API
       const form = new FormData();
@@ -2102,9 +2101,24 @@ async function analyzeVoice(video) {
         { method: 'POST', body: form }
       );
       if (!upRes.ok) throw new Error(`Files API ${upRes.status}`);
-      const { file } = await upRes.json();
-      const fileUri  = file?.uri;
+      const upData   = await upRes.json();
+      const fileUri  = upData.file?.uri;
+      const fileName = upData.file?.name;
       if (!fileUri) throw new Error('URI não retornada');
+
+      // Wait for file to be ACTIVE
+      title.textContent = 'Aguardando processamento...';
+      for (let attempt = 0; attempt < 10; attempt++) {
+        await sleep(2000);
+        try {
+          const stRes  = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${S.geminiKey}`);
+          const stData = await stRes.json();
+          if (stData.state === 'ACTIVE') break;
+          if (stData.state === 'FAILED') throw new Error('Arquivo falhou no processamento');
+        } catch(e) { if (e.message.includes('FAILED')) throw e; }
+      }
+
+      title.textContent = 'Analisando voz com Gemini...';
 
       // Ask Gemini to analyze the voice
       const genRes = await fetch(
@@ -2124,7 +2138,7 @@ async function analyzeVoice(video) {
   "summary_pt": "Uma frase em português descrevendo a voz (máx 15 palavras)"
 }` }
             ]}],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 256 }
+            generationConfig: { temperature: 0.1, maxOutputTokens: 512 }
           })
         }
       );
