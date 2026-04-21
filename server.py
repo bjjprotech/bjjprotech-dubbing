@@ -123,12 +123,26 @@ def upload_caption(video_guid, library_id, api_key, lang, label, srt_content):
     return r.status_code in (200, 201)
 
 def enable_multi_audio(library_id, api_key):
+    """
+    Ativa Multi Audio Track Support.
+    Nota: este endpoint requer a API Key da CONTA (não da biblioteca).
+    Se der 401, o multi-audio precisa ser ativado manualmente no painel Bunny:
+    Dashboard → Stream → sua biblioteca → Encoding → Enable Multi Audio Track Support
+    """
     try:
+        # Try with stream library key first
         r = requests.post(
             f"https://api.bunny.net/videolibrary/{library_id}",
-            headers={"AccessKey": api_key, "Content-Type": "application/json"},
+            headers={
+                "AccessKey": api_key,
+                "Content-Type": "application/json",
+                "accept": "application/json"
+            },
             json={"EnableMultiAudioTrackSupport": True}, timeout=15)
         log(f"  Multi Audio Track: HTTP {r.status_code}")
+        if r.status_code == 401:
+            log(f"  AVISO: Multi Audio precisa ser ativado manualmente no painel Bunny")
+            log(f"  Dashboard → Stream → biblioteca → Encoding → Multi Audio Track Support")
     except Exception as e:
         log(f"  Multi Audio Track warning: {e}")
 
