@@ -2402,6 +2402,12 @@ function saveCfg() {
     const el = document.getElementById(k);
     if (el) cfg[k] = el.value;
   });
+  // Always save container proxy with https://
+  if (cfg.cfgContainerProxy && !cfg.cfgContainerProxy.startsWith('http')) {
+    cfg.cfgContainerProxy = 'https://' + cfg.cfgContainerProxy;
+    const el = document.getElementById('cfgContainerProxy');
+    if (el) el.value = cfg.cfgContainerProxy;
+  }
   // Save selected langs
   cfg.langs = [...S.langs].join(',');
   // Save voice selections
@@ -2415,6 +2421,12 @@ function loadCfg() {
     const raw = localStorage.getItem('bjjprotech_cfg');
     if (!raw) return false;
     const cfg = JSON.parse(raw);
+
+    // Fix container proxy URL — ensure https://
+    if (cfg.cfgContainerProxy && !cfg.cfgContainerProxy.startsWith('http')) {
+      cfg.cfgContainerProxy = 'https://' + cfg.cfgContainerProxy;
+    }
+
     CFG_KEYS.forEach(k => {
       const el = document.getElementById(k);
       if (el && cfg[k]) el.value = cfg[k];
@@ -2440,6 +2452,11 @@ function loadCfg() {
     S.bunnyKey   = document.getElementById('cfgBunnyKey')?.value || '';
     S.cdnHost    = document.getElementById('cfgCdn')?.value || '';
     S.geminiKey  = document.getElementById('cfgGeminiKey')?.value || '';
+    // Ensure container proxy has https://
+    const cpField = document.getElementById('cfgContainerProxy');
+    if (cpField && cpField.value && !cpField.value.startsWith('http')) {
+      cpField.value = 'https://' + cpField.value;
+    }
     return true;
   } catch(e) { return false; }
 }
