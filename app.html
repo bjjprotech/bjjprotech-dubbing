@@ -1304,8 +1304,8 @@ async function callTTSSegmented(srt, voice, langCode, onProgress) {
         return await callTTS(text, voice, langCode);
       } catch(e) {
         if (e.message.includes('429') && attempt < maxRetries - 1) {
-          // Rate limit — aguarda antes de tentar novamente
-          const waitMs = (attempt + 1) * 3000; // 3s, 6s, 9s
+          // Rate limit — aguarda tempo maior antes de tentar novamente
+          const waitMs = (attempt + 1) * 10000; // 10s, 20s, 30s
           await sleep(waitMs);
           continue;
         }
@@ -1325,7 +1325,7 @@ async function callTTSSegmented(srt, voice, langCode, onProgress) {
     completed++;
     onProgress && onProgress(Math.round(completed / segments.length * 85));
     // Pausa de 1s entre segmentos para respeitar rate limit
-    if (i < segments.length - 1) await sleep(1000);
+    if (i < segments.length - 1) await sleep(1500);
   }
 
   onProgress && onProgress(88);
@@ -1467,7 +1467,10 @@ ${text}` : text;
       })
     }
   );
-  if (!res.ok) throw new Error(`TTS ${res.status}: ${(await res.text()).substring(0,80)}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`TTS ${res.status}: ${errText.substring(0,200)}`);
+  }
   const d = await res.json();
   const b64 = d.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
   if (!b64) throw new Error('Áudio não retornado');
