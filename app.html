@@ -1309,20 +1309,39 @@ async function callTTSSegmented(srt, voice, langCode, onProgress) {
 
   onProgress && onProgress(2);
 
-  // Processa segmentos em batches de 3 simultâneos
+  // Processa segmentos sequencialmente com retry para evitar 429
   const audioSegments = new Array(segments.length);
   let completed = 0;
 
-  for (let i = 0; i < segments.length; i += CONCURRENCY) {
-    const batch = segments.slice(i, i + CONCURRENCY);
+  async function callTTSWithRetry(text, voice, langCode, maxRetries = 3) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await callTTS(text, voice, langCode);
+      } catch(e) {
+        if (e.message.includes('429') && attempt < maxRetries - 1) {
+          // Rate limit — aguarda antes de tentar novamente
+          const waitMs = (attempt + 1) * 3000; // 3s, 6s, 9s
+          await sleep(waitMs);
+          continue;
+        }
+        throw e;
+      }
+    }
+  }
+
+  // Processa em batches pequenos de 2 com pausa entre batches
+  const BATCH_SIZE = 2;
+  for (let i = 0; i < segments.length; i += BATCH_SIZE) {
+    const batch = segments.slice(i, i + BATCH_SIZE);
     const results = await Promise.all(batch.map(async (seg) => {
       if (!seg.text.trim()) return null;
-      const blob = await callTTS(seg.text, voice, langCode);
-      return blob;
+      return await callTTSWithRetry(seg.text, voice, langCode);
     }));
     results.forEach((blob, j) => { audioSegments[i + j] = blob; });
     completed += batch.length;
     onProgress && onProgress(Math.round(completed / segments.length * 85));
+    // Pequena pausa entre batches para evitar rate limit
+    if (i + BATCH_SIZE < segments.length) await sleep(500);
   }
 
   onProgress && onProgress(88);
@@ -1433,13 +1452,27 @@ async function mergeWavBlobs(blobs) {
 }
 
 async function callTTS(text, voice, langCode) {
+  // Add voice instruction to text to help Gemini use correct voice characteristics
+  // This helps ensure masculine voices sound masculine
+  const voiceInstructions = {
+    'Charon': 'Speak in a deep, authoritative male voice.',
+    'Fenrir': 'Speak in a firm, direct male voice.',
+    'Orus':   'Speak in a deep, calm male voice.',
+    'Puck':   'Speak in an energetic, expressive male voice.',
+    'Kore':   'Speak in a clear, precise female voice.',
+    'Aoede':  'Speak in a soft, natural female voice.',
+  };
+  const instruction = voiceInstructions[voice] || '';
+  const textWithInstruction = instruction ? `[${instruction}]
+${text}` : text;
+
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key=${S.geminiKey}`,
     {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify({
-        contents:[{ parts:[{ text }] }],
+        contents:[{ parts:[{ text: textWithInstruction }] }],
         generationConfig:{
           responseModalities:['AUDIO'],
           speechConfig:{
@@ -1991,6 +2024,9 @@ function aLog(c, type, msg) {
   const d=document.createElement('div'); d.className='ll';
   d.innerHTML=`<span class="lt">${t}</span><span class="${cls}">${sym}</span><span class="lm">${msg}</span>`;
   c.appendChild(d); c.scrollTop=c.scrollHeight;
+  // Captura no log completo para o relatório
+  if (!Array.isArray(S.fullLog)) S.fullLog = [];
+  S.fullLog.push(`[${t}] ${sym} ${msg}`);
 }
 
 // ════════════════════════════════════════
