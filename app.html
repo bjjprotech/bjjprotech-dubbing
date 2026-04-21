@@ -781,9 +781,8 @@ function goStep(n) {
   }
   const backBtn = document.getElementById('btn-back');
   if (backBtn) backBtn.style.display = n > 1 ? 'inline-flex' : 'none';
-  if (n === 3) startTranslation();
-  if (n === 4) startDubbing();
-  if (n === 5) startUpload();
+  // Note: pipeline steps are started by runFullPipeline(), not here
+  // goStep() only updates the UI
 }
 
 function navStep(n) {
