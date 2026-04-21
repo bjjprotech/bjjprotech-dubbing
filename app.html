@@ -594,6 +594,7 @@ const S = {
   audioBlobs:{},
   startTs:null,
   modalCb:null,
+  fullLog: [],  // log completo de execução
 };
 
 const TRS_PER_MIN = 0.025;
@@ -1195,14 +1196,15 @@ async function startDubbing() {
     piSub(`pb-d-${i}`, 'Enviando texto para TTS...');
     await animFill(`pf-d-${i}`, 20, 300);
 
-    const text = srtToText(S.srt[l] || S.srt.pt);
+    const srtForLang = S.srt[l] || '';
 
     try {
       if (S.geminiKey) {
-        // Divide em chunks de ~800 palavras e processa em paralelo
-        const blob = await callTTSChunked(text, vmap[l], lcode[l], (pct) => {
+        // TTS por segmento SRT — sincronizado com timestamps
+        aLog(log,'in',`${flags[l]} Gerando TTS por segmento (sincronizado)...`);
+        const blob = await callTTSSegmented(srtForLang, vmap[l], lcode[l], (pct) => {
           animFill(`pf-d-${i}`, 20 + pct * 0.75, 100);
-          piSub(`pb-d-${i}`, `TTS: ${pct}%`);
+          piSub(`pb-d-${i}`, `TTS: ${pct}% — sincronizando com SRT`);
         });
         S.audioBlobs[l] = blob;
         aLog(log,'ok',`${flags[l]} Áudio: ${(blob.size/1024).toFixed(0)} KB`);
@@ -1228,26 +1230,171 @@ async function startDubbing() {
   document.getElementById('audio-panel').style.display = 'block';
 }
 
-// Divide o texto em chunks e processa em paralelo, depois concatena os WAVs
+// ── TTS POR SEGMENTO SRT ──────────────────────────────────────────────────
+// Gera áudio para cada segmento do SRT respeitando os timestamps
+// Resultado: WAV sincronizado com o vídeo original
+
+function parseSrtSegments(srt) {
+  // Retorna array de { index, start_ms, end_ms, text }
+  if (!srt) return [];
+  return srt.trim().split(/\n\n+/).map(block => {
+    const lines = block.trim().split('\n');
+    if (lines.length < 3) return null;
+    const timeLine = lines[1];
+    const match = timeLine.match(/(\d+):(\d+):(\d+)[,\.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,\.](\d+)/);
+    if (!match) return null;
+    const toMs = (h,m,s,ms) => (+h*3600000) + (+m*60000) + (+s*1000) + +ms;
+    return {
+      index: parseInt(lines[0]),
+      start_ms: toMs(match[1],match[2],match[3],match[4]),
+      end_ms:   toMs(match[5],match[6],match[7],match[8]),
+      text: lines.slice(2).join(' ').trim()
+    };
+  }).filter(Boolean);
+}
+
+function createSilenceWav(durationMs, sampleRate = 24000) {
+  // Cria WAV de silêncio com duração em ms
+  const numSamples = Math.floor(sampleRate * durationMs / 1000);
+  const dataSize   = numSamples * 2; // 16-bit = 2 bytes por sample
+  const buf  = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buf);
+  // RIFF header
+  [0x52,0x49,0x46,0x46].forEach((b,i) => view.setUint8(i,b));
+  view.setUint32(4,  36 + dataSize, true);
+  [0x57,0x41,0x56,0x45].forEach((b,i) => view.setUint8(8+i,b));
+  [0x66,0x6D,0x74,0x20].forEach((b,i) => view.setUint8(12+i,b));
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1,  true);  // PCM
+  view.setUint16(22, 1,  true);  // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2,  true);
+  view.setUint16(34, 16, true);
+  [0x64,0x61,0x74,0x61].forEach((b,i) => view.setUint8(36+i,b));
+  view.setUint32(40, dataSize, true);
+  // Silence = zeros (already 0)
+  return new Uint8Array(buf);
+}
+
+function pcmToWav(pcmData, sampleRate = 24000) {
+  // Wraps raw PCM bytes in a WAV header
+  const dataSize = pcmData.byteLength;
+  const buf  = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buf);
+  [0x52,0x49,0x46,0x46].forEach((b,i) => view.setUint8(i,b));
+  view.setUint32(4,  36 + dataSize, true);
+  [0x57,0x41,0x56,0x45].forEach((b,i) => view.setUint8(8+i,b));
+  [0x66,0x6D,0x74,0x20].forEach((b,i) => view.setUint8(12+i,b));
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1,  true);
+  view.setUint16(22, 1,  true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2,  true);
+  view.setUint16(34, 16, true);
+  [0x64,0x61,0x74,0x61].forEach((b,i) => view.setUint8(36+i,b));
+  view.setUint32(40, dataSize, true);
+  const out = new Uint8Array(buf);
+  out.set(new Uint8Array(pcmData instanceof ArrayBuffer ? pcmData : pcmData.buffer), 44);
+  return out;
+}
+
+async function callTTSSegmented(srt, voice, langCode, onProgress) {
+  const SAMPLE_RATE = 24000;
+  const CONCURRENCY = 3;
+
+  const segments = parseSrtSegments(srt);
+  if (!segments.length) throw new Error('Nenhum segmento SRT encontrado');
+
+  onProgress && onProgress(2);
+
+  // Processa segmentos em batches de 3 simultâneos
+  const audioSegments = new Array(segments.length);
+  let completed = 0;
+
+  for (let i = 0; i < segments.length; i += CONCURRENCY) {
+    const batch = segments.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(batch.map(async (seg) => {
+      if (!seg.text.trim()) return null;
+      const blob = await callTTS(seg.text, voice, langCode);
+      return blob;
+    }));
+    results.forEach((blob, j) => { audioSegments[i + j] = blob; });
+    completed += batch.length;
+    onProgress && onProgress(Math.round(completed / segments.length * 85));
+  }
+
+  onProgress && onProgress(88);
+
+  // Monta o WAV final respeitando os timestamps do SRT
+  // Cada segmento começa no start_ms do SRT, com silêncio antes se necessário
+  const totalDurationMs = segments[segments.length - 1].end_ms + 500; // +500ms de margem
+  const totalSamples    = Math.floor(SAMPLE_RATE * totalDurationMs / 1000);
+  const outputPcm       = new Int16Array(totalSamples); // inicializado com zeros (silêncio)
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg  = segments[i];
+    const blob = audioSegments[i];
+    if (!blob) continue;
+
+    const arrayBuf  = await blob.arrayBuffer();
+    const dataView  = new DataView(arrayBuf);
+
+    // Detecta se é WAV (RIFF) ou PCM raw
+    let pcmBytes;
+    const magic = String.fromCharCode(dataView.getUint8(0), dataView.getUint8(1),
+                                       dataView.getUint8(2), dataView.getUint8(3));
+    if (magic === 'RIFF') {
+      // WAV — pula header de 44 bytes
+      pcmBytes = new Int16Array(arrayBuf, 44);
+    } else {
+      // PCM raw
+      pcmBytes = new Int16Array(arrayBuf);
+    }
+
+    // Posição no output onde este segmento começa (em samples)
+    const startSample = Math.floor(SAMPLE_RATE * seg.start_ms / 1000);
+
+    // Copia os samples do segmento para a posição correta
+    // Se o áudio for maior que o slot, trunca para caber até o próximo segmento
+    const nextStart = i < segments.length - 1
+      ? Math.floor(SAMPLE_RATE * segments[i+1].start_ms / 1000)
+      : totalSamples;
+    const maxSamples = Math.min(pcmBytes.length, nextStart - startSample);
+
+    for (let s = 0; s < maxSamples && (startSample + s) < totalSamples; s++) {
+      outputPcm[startSample + s] = pcmBytes[s];
+    }
+  }
+
+  onProgress && onProgress(96);
+
+  // Converte PCM final para WAV
+  const wavBytes = pcmToWav(outputPcm.buffer, SAMPLE_RATE);
+  onProgress && onProgress(100);
+
+  return new Blob([wavBytes], { type: 'audio/wav' });
+}
+
+// Mantém callTTSChunked como fallback mas usa segmentado por padrão
 async function callTTSChunked(text, voice, langCode, onProgress) {
-  const CHUNK_WORDS = 600; // ~2-3 min de áudio por chunk
+  // Fallback: processa texto corrido (sem sincronização)
+  const CHUNK_WORDS = 600;
   const words = text.split(' ');
 
   if (words.length <= CHUNK_WORDS) {
-    // Texto curto — processa direto
     onProgress && onProgress(50);
     const blob = await callTTS(text, voice, langCode);
     onProgress && onProgress(100);
     return blob;
   }
 
-  // Divide em chunks
   const chunks = [];
   for (let i = 0; i < words.length; i += CHUNK_WORDS) {
     chunks.push(words.slice(i, i + CHUNK_WORDS).join(' '));
   }
 
-  // Processa chunks em paralelo (máx 3 simultâneos para não sobrecarregar a API)
   const CONCURRENCY = 3;
   const blobs = new Array(chunks.length);
   let completed = 0;
@@ -1255,27 +1402,23 @@ async function callTTSChunked(text, voice, langCode, onProgress) {
   for (let i = 0; i < chunks.length; i += CONCURRENCY) {
     const batch = chunks.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.all(
-      batch.map((chunk, j) => callTTS(chunk, voice, langCode))
+      batch.map((chunk) => callTTS(chunk, voice, langCode))
     );
     batchResults.forEach((blob, j) => { blobs[i + j] = blob; });
     completed += batch.length;
     onProgress && onProgress(Math.round(completed / chunks.length * 95));
   }
 
-  // Concatena todos os WAVs em um único blob
   const merged = await mergeWavBlobs(blobs);
   onProgress && onProgress(100);
   return merged;
 }
 
-// Concatena múltiplos WAV blobs — pula o header de cada um exceto o primeiro
+// Concatena múltiplos WAV blobs
 async function mergeWavBlobs(blobs) {
   const buffers = await Promise.all(blobs.map(b => b.arrayBuffer()));
-
-  // WAV header = 44 bytes. Primeiro buffer completo, resto pula header
   const totalSize = buffers.reduce((a, b, i) => a + (i === 0 ? b.byteLength : b.byteLength - 44), 0);
   const merged = new Uint8Array(totalSize);
-
   let offset = 0;
   buffers.forEach((buf, i) => {
     const data = new Uint8Array(buf);
@@ -1283,12 +1426,9 @@ async function mergeWavBlobs(blobs) {
     merged.set(data.subarray(start), offset);
     offset += data.byteLength - (i === 0 ? 0 : 44);
   });
-
-  // Atualiza o tamanho no header WAV
   const view = new DataView(merged.buffer);
-  view.setUint32(4, totalSize - 8, true);   // ChunkSize
-  view.setUint32(40, totalSize - 44, true); // Subchunk2Size
-
+  view.setUint32(4,  totalSize - 8,  true);
+  view.setUint32(40, totalSize - 44, true);
   return new Blob([merged], { type: 'audio/wav' });
 }
 
@@ -1863,6 +2003,35 @@ function fmtSz(b)  { if(!b)return'—'; return b>1e9?(b/1e9).toFixed(1)+' GB':(b
 function fmtElapsed(ts) { if(!ts)return'—'; const s=Math.floor((Date.now()-ts)/1000); return s>60?`${Math.floor(s/60)}m ${s%60}s`:`${s}s`; }
 function countEntries(srt) { return srt?srt.trim().split(/\n\n+/).length:0; }
 function srtToText(srt)    { if(!srt)return''; return srt.trim().split(/\n\n+/).map(b=>{const ls=b.trim().split('\n');return ls.slice(2).join(' ');}).filter(Boolean).join('\n'); }
+
+function formatSrtLines(text, maxChars = 42) {
+  // Breaks text into lines of max 42 chars, max 2 lines
+  const words = text.trim().split(/\s+/);
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    if ((current + ' ' + word).trim().length <= maxChars) {
+      current = (current + ' ' + word).trim();
+    } else {
+      if (current) lines.push(current);
+      current = word;
+      if (lines.length >= 2) break; // max 2 lines
+    }
+  }
+  if (current && lines.length < 2) lines.push(current);
+  return lines.join('\n');
+}
+
+function reformatSrt(srt) {
+  // Reformats SRT to have max 42 chars per line, 2 lines max
+  if (!srt) return srt;
+  return srt.trim().split(/\n\n+/).map(block => {
+    const lines = block.trim().split('\n');
+    if (lines.length < 3) return block;
+    const text = lines.slice(2).join(' ');
+    return `${lines[0]}\n${lines[1]}\n${formatSrtLines(text)}`;
+  }).join('\n\n') + '\n\n';
+}
 
 function mockSrt(title, off=0) {
   const f=s=>{const t=(off*60)+s;const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),sc=t%60;return`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sc).padStart(2,'0')},000`;};
