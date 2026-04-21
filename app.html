@@ -866,9 +866,32 @@ async function runFullPipeline() {
     await startDubbing();
 
     // ETAPA 4b: Upload automático no Bunny (merge + audio)
-    const containerProxy = (document.getElementById('cfgContainerProxy')?.value?.trim() || S.proxy).replace(/\/$/, '');
-    if (containerProxy && Object.values(S.audioBlobs).some(b => b)) {
+    let containerProxy = (document.getElementById('cfgContainerProxy')?.value?.trim() || S.proxy || '').trim();
+  // Fix common URL mistakes
+  containerProxy = containerProxy.replace(/\/$/, ''); // remove trailing slash
+  if (containerProxy && !containerProxy.startsWith('http')) {
+    containerProxy = 'https://' + containerProxy; // add https if missing
+  }
+  // Fix double domain issue
+  const domainMatch = containerProxy.match(/https:\/\/([^/]+)/);
+  if (domainMatch) {
+    const domain = domainMatch[1];
+    if (containerProxy.includes(domain + '/' + domain)) {
+      containerProxy = 'https://' + domain;
+    }
+  }
+    const hasAudio = Object.values(S.audioBlobs).some(b => b);
+
+    if (containerProxy && hasAudio) {
+      // Garantir que o painel de áudio está visível antes de chamar
+      document.getElementById('audio-panel').style.display = 'block';
+      // Pequena pausa para o DOM atualizar
+      await sleep(500);
       await startAutoUpload();
+    } else if (!hasAudio) {
+      aLog(document.getElementById('log-d'), 'wn', 'Sem áudios gerados — pulando upload de faixas');
+    } else if (!containerProxy) {
+      aLog(document.getElementById('log-d'), 'wn', 'Worker URL não configurada — pulando upload de faixas');
     }
 
     // ETAPA 5: Upload SRT (automático)
