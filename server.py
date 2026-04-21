@@ -146,6 +146,126 @@ def enable_multi_audio(library_id, api_key):
     except Exception as e:
         log(f"  Multi Audio Track warning: {e}")
 
+def parse_srt_timestamps(srt_content):
+    """Parse SRT and return list of (start_ms, end_ms, text)"""
+    import re
+    segments = []
+    blocks = re.split(r'\n\n+', srt_content.strip())
+    for block in blocks:
+        lines = block.strip().split('\n')
+        if len(lines) < 3: continue
+        m = re.match(r'(\d+):(\d+):(\d+)[,\.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,\.](\d+)', lines[1])
+        if not m: continue
+        def to_ms(h,m,s,ms): return int(h)*3600000 + int(m)*60000 + int(s)*1000 + int(ms)
+        start = to_ms(*m.groups()[:4])
+        end   = to_ms(*m.groups()[4:])
+        text  = ' '.join(lines[2:])
+        segments.append((start, end, text))
+    return segments
+
+def sync_audio_to_srt(wav_path, srt_content, tmp, lang):
+    """
+    Syncs dubbed WAV to SRT timestamps using FFmpeg.
+    The dubbed audio (text corrido) is split into segments matching SRT timing.
+    Each segment is placed at the correct timestamp with silence between.
+    """
+    import math
+    segments = parse_srt_timestamps(srt_content)
+    if not segments: return None
+
+    total_ms = segments[-1][1] + 500
+    total_s  = total_ms / 1000.0
+
+    # Get duration of dubbed audio
+    probe = subprocess.run([
+        'ffprobe', '-v', 'quiet', '-print_format', 'json',
+        '-show_streams', str(wav_path)
+    ], capture_output=True, text=True)
+
+    import json as _json
+    try:
+        probe_data = _json.loads(probe.stdout)
+        dub_duration_s = float(probe_data['streams'][0]['duration'])
+    except:
+        log(f"  Sync {lang}: não foi possível determinar duração, usando sem sync")
+        return None
+
+    # Total text duration from SRT
+    text_total_ms = sum(e - s for s, e, _ in segments)
+    text_total_s  = text_total_ms / 1000.0
+
+    if text_total_s <= 0: return None
+
+    # Build FFmpeg filter to place audio segments at correct timestamps
+    # Strategy: split dubbed audio proportionally by segment text length
+    # and place each piece at the correct SRT timestamp
+    total_chars = sum(len(t) for _, _, t in segments)
+    if total_chars == 0: return None
+
+    # Create silent base track
+    silence_path = tmp / f'silence_{lang}.wav'
+    result = subprocess.run([
+        'ffmpeg', '-y',
+        '-f', 'lavfi', '-i', f'anullsrc=channel_layout=mono:sample_rate=44100',
+        '-t', str(total_s + 1),
+        str(silence_path)
+    ], capture_output=True, timeout=60)
+    if result.returncode != 0: return None
+
+    # Extract segments from dubbed audio based on proportional timing
+    segment_files = []
+    current_pos_s = 0.0
+    for i, (start_ms, end_ms, text) in enumerate(segments):
+        char_ratio = len(text) / total_chars
+        seg_dur_s  = dub_duration_s * char_ratio
+
+        seg_path = tmp / f'seg_{lang}_{i}.wav'
+        result = subprocess.run([
+            'ffmpeg', '-y',
+            '-i', str(wav_path),
+            '-ss', str(current_pos_s),
+            '-t',  str(seg_dur_s),
+            '-ar', '44100', '-ac', '1',
+            str(seg_path)
+        ], capture_output=True, timeout=60)
+
+        if result.returncode == 0:
+            segment_files.append((start_ms / 1000.0, seg_path))
+
+        current_pos_s += seg_dur_s
+
+    if not segment_files: return None
+
+    # Mix all segments into the silence base at correct timestamps
+    # Build amix filter
+    inputs = ['-i', str(silence_path)]
+    for _, seg_path in segment_files:
+        inputs += ['-i', str(seg_path)]
+
+    filter_parts = []
+    for i, (ts, _) in enumerate(segment_files):
+        filter_parts.append(f'[{i+1}]adelay={int(ts*1000)}|{int(ts*1000)}[d{i}]')
+
+    mix_inputs = '[0]' + ''.join(f'[d{i}]' for i in range(len(segment_files)))
+    filter_parts.append(f'{mix_inputs}amix=inputs={len(segment_files)+1}:normalize=0[out]')
+
+    filter_str = ';'.join(filter_parts)
+
+    synced_path = tmp / f'synced_{lang}.wav'
+    cmd = ['ffmpeg', '-y'] + inputs + [
+        '-filter_complex', filter_str,
+        '-map', '[out]',
+        '-ar', '44100', '-ac', '1',
+        str(synced_path)
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    if result.returncode != 0:
+        log(f"  Sync {lang} FFmpeg erro: {result.stderr[-200:]}")
+        return None
+
+    log(f"  Sync {lang}: {synced_path.stat().st_size//1024}KB sincronizado")
+    return synced_path
+
 def wait_for_encoding(video_guid, library_id, api_key, timeout_min=30):
     status_names = {0:"na fila",1:"processando",2:"transcoding",
                     3:"redimensionando",4:"concluído",5:"erro",6:"falhou"}
@@ -236,6 +356,15 @@ def process_job(job_id, payload):
             merged_path = tmp / 'multilingual.mp4'
             lang_order  = [t['lang'] for t in audio_tracks]
             lang_labels = {t['lang']: t['label'] for t in audio_tracks}
+            srts_data   = payload.get('srts_audio', {})  # SRT per lang for sync
+
+            # If SRT data provided, sync each audio track to SRT timestamps
+            for lang in lang_order:
+                if lang in srts_data and srts_data[lang] and lang in wav_paths:
+                    synced = sync_audio_to_srt(wav_paths[lang], srts_data[lang], tmp, lang)
+                    if synced:
+                        wav_paths[lang] = synced
+                        log(f"  Sync SRT {lang.upper()}: OK")
 
             LANG_ISO = {'pt':'por','en':'eng','es':'spa','fr':'fra'}
 
