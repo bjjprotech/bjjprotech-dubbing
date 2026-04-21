@@ -227,7 +227,7 @@ body{background:var(--bg);color:var(--text);font-family:'Literata',serif;font-si
 .mdl-acts{display:flex;gap:7px;justify-content:flex-end}
 
 /* TOAST */
-.toasts{position:fixed;bottom:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:7px}
+.toasts{position:fixed;top:60px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:7px}
 .toast{background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:9px 13px;font-size:13px;display:flex;align-items:center;gap:8px;min-width:250px;box-shadow:0 3px 16px rgba(0,0,0,.09);animation:slr .22s ease}
 @keyframes slr{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
 .toast.ok{border-left:3px solid var(--green)} .toast.err{border-left:3px solid var(--accent)} .toast.inf{border-left:3px solid var(--blue)}
@@ -526,9 +526,7 @@ body{background:var(--bg);color:var(--text);font-family:'Literata',serif;font-si
             <button class="btn btn-primary" id="btn-auto-upload" onclick="startAutoUpload()" style="flex:1">
               ☁ Mesclar + Upload Automático no Bunny
             </button>
-            <button class="btn btn-outline" onclick="generateScript()" style="flex:none;width:auto;padding:10px 14px" title="Alternativa: gerar script Python para rodar localmente">
-              ⬇ Script Python
-            </button>
+
           </div>
         </div>
       </div>
@@ -556,7 +554,6 @@ body{background:var(--bg);color:var(--text);font-family:'Literata',serif;font-si
           </div>
           <div class="done-acts">
             <button class="btn btn-primary btn-sm" onclick="resetAll()" style="width:auto;padding:8px 18px">Processar mais vídeos</button>
-            <button class="btn btn-green btn-sm" onclick="generateScript()" style="width:auto;padding:8px 18px">⬇ Script Python</button>
             <button class="btn btn-outline btn-sm" onclick="dlReport()" style="width:auto;padding:8px 18px">↓ Relatório</button>
           </div>
         </div>
@@ -808,42 +805,7 @@ function navStep(n) {
   setTimeout(() => { if (psN) psN.style.outline = ''; }, 1000);
 }
 
-// ════════════════════════════════════════
-// VOICE CONFIRMATION BEFORE PIPELINE
-// ════════════════════════════════════════
-function showVoiceConfirmation() {
-  // If voice analysis already done and voices are shown, go straight to pipeline
-  const voiceLists = document.getElementById('voice-lists');
-  const alreadyAnalyzed = voiceLists && voiceLists.style.display !== 'none';
-
-  if (!alreadyAnalyzed) {
-    // No analysis yet — ask if wants to proceed with default voices
-    showModal(
-      '🎤 Configurar Vozes',
-      `As vozes ainda não foram analisadas para este vídeo.<br><br>
-       <strong>Opção A:</strong> Aguardar análise automática de voz (recomendado — a IA analisa o instrutor e sugere a voz mais próxima)<br><br>
-       <strong>Opção B:</strong> Usar voz padrão <strong>Charon</strong> e iniciar agora`,
-      () => { closeModal(); S.startTs = Date.now(); runFullPipeline(); },
-      'Iniciar com Charon'
-    );
-    // Also scroll to voice section
-    document.querySelector('.sb-blk:last-of-type')?.scrollIntoView({behavior:'smooth'});
-    return;
-  }
-
-  // Voices already shown — confirm selection and go
-  const voiceEn = S.voiceSel?.en || 'Charon';
-  const voiceEs = S.voiceSel?.es || 'Charon';
-  showModal(
-    '🎤 Confirmar Vozes',
-    `Vozes selecionadas:<br><br>
-     🇺🇸 <strong>Inglês:</strong> ${voiceEn}<br>
-     🇪🇸 <strong>Espanhol:</strong> ${voiceEs}<br><br>
-     Clique em ▶ na barra lateral para ouvir amostras antes de confirmar.`,
-    () => { closeModal(); S.startTs = Date.now(); runFullPipeline(); },
-    'Confirmar e Iniciar'
-  );
-}
+// showVoiceConfirmation removed — voice info now shown in main confirmStart modal
 
 // ════════════════════════════════════════
 // FULL AUTO PIPELINE — roda tudo sem interrupção
@@ -930,16 +892,29 @@ function confirmStart() {
   const ct = (mins * TRS_PER_MIN).toFixed(2);
   const cd = (mins * TTS_PER_MIN * dubL.length).toFixed(2);
   showModal('🚀 Iniciar Pipeline',
-    `<strong>${sel.length} vídeo(s)</strong> · <strong>${mins} minutos</strong> de áudio<br><br>
+(() => {
+      const voiceEn = S.voiceSel?.en || 'Charon';
+      const voiceEs = S.voiceSel?.es || 'Charon';
+      const voicesAnalyzed = document.getElementById('voice-lists')?.style.display !== 'none';
+      const voiceInfo = voicesAnalyzed
+        ? `🎤 Vozes: 🇺🇸 <strong>${voiceEn}</strong> · 🇪🇸 <strong>${voiceEs}</strong><br><br>`
+        : `🎤 Vozes: <strong>Charon</strong> (padrão — análise pendente)<br><br>`;
+      return `<strong>${sel.length} vídeo(s)</strong> · <strong>${mins} minutos</strong> de áudio<br><br>
      ✅ Pipeline 100% automático — sem aprovação por etapa<br><br>
-     • Etapa 2 — Transcrição PT-BR: ~$${ct}<br>
-     • Etapa 3 — Tradução ${dubL.map(l=>l.toUpperCase()).join('+')}: incluso<br>
-     • Etapa 4 — Dublagem TTS: ~$${cd}<br>
-     • Etapa 4b — Merge + Upload Bunny: Railway<br>
-     • Etapa 5 — Upload SRT: grátis<br><br>
-     <strong>Custo total estimado: ~$${(parseFloat(ct)+parseFloat(cd)).toFixed(2)}</strong><br>
-     <strong>IDs preservados — links da plataforma intactos.</strong>`,
-    () => { closeModal(); showVoiceConfirmation(); }
+     ${voiceInfo}• Transcrição PT-BR: ~$${ct}<br>
+     • Tradução ${dubL.map(l=>l.toUpperCase()).join('+')}: incluso<br>
+     • Dublagem TTS: ~$${cd}<br>
+     • Merge + Upload Bunny: Railway<br>
+     • Upload SRT: grátis<br><br>
+     <strong>Custo total: ~$${(parseFloat(ct)+parseFloat(cd)).toFixed(2)}</strong><br>
+     <strong>IDs preservados — links intactos.</strong>`;
+    })(),
+    () => {
+      closeModal();
+      if (S.pipelineRunning) return; // extra guard
+      S.startTs = Date.now();
+      runFullPipeline();
+    }
   );
 }
 
