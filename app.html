@@ -1178,15 +1178,15 @@ async function startDubbing() {
     piSub(`pb-d-${i}`, 'Enviando texto para TTS...');
     await animFill(`pf-d-${i}`, 20, 300);
 
-    const srtForLang = S.srt[l] || '';
+    const text = srtToText(S.srt[l] || S.srt.pt);
 
     try {
       if (S.geminiKey) {
-        // TTS por segmento SRT — sincronizado com timestamps
-        aLog(log,'in',`${flags[l]} Gerando TTS por segmento (sincronizado)...`);
-        const blob = await callTTSSegmented(srtForLang, vmap[l], lcode[l], (pct) => {
+        // TTS em chunks de texto corrido — menos chamadas à API, sem 429
+        aLog(log,'in',`${flags[l]} Gerando TTS (texto corrido)...`);
+        const blob = await callTTSChunked(text, vmap[l], lcode[l], (pct) => {
           animFill(`pf-d-${i}`, 20 + pct * 0.75, 100);
-          piSub(`pb-d-${i}`, `TTS: ${pct}% — sincronizando com SRT`);
+          piSub(`pb-d-${i}`, `TTS: ${pct}%`);
         });
         S.audioBlobs[l] = blob;
         aLog(log,'ok',`${flags[l]} Áudio: ${(blob.size/1024).toFixed(0)} KB`);
