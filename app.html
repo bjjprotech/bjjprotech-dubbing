@@ -849,6 +849,11 @@ function showVoiceConfirmation() {
 // FULL AUTO PIPELINE — roda tudo sem interrupção
 // ════════════════════════════════════════
 async function runFullPipeline() {
+  // Guard against double execution
+  if (S.pipelineRunning) {
+    toast('Pipeline já está em execução', 'wn');
+    return;
+  }
   S.pipelineRunning = true;
   S.fullLog = []; // Reset log for new pipeline run
   const log = document.getElementById('log-t');
@@ -1187,10 +1192,13 @@ async function startDubbing() {
 
   const audioItems = [];
 
-  // Processa todos os idiomas em PARALELO
-  aLog(log,'in',`Iniciando dublagem em paralelo — ${langs.length} idiomas simultâneos...`);
+  // Processa idiomas sequencialmente para evitar rate limit 429
+  aLog(log,'in',`Iniciando dublagem — ${langs.length} idiomas em sequência...`);
 
-  const results = await Promise.all(langs.map(async (l, i) => {
+  const results = [];
+  for (let i = 0; i < langs.length; i++) {
+    const l = langs[i];
+    results.push(await (async (l, i) => {
     piSt(i,'d','run','gerando TTS...');
     aLog(log,'in',`${flags[l]} Gemini TTS — voz: ${vmap[l]}, ${lcode[l]}`);
     piSub(`pb-d-${i}`, 'Enviando texto para TTS...');
@@ -1223,7 +1231,10 @@ async function startDubbing() {
     await animFill(`pf-d-${i}`, 100, 200);
     piSt(i,'d','ok','✓ concluído');
     return { l, voice:vmap[l], flag:flags[l] };
-  }));
+    })(l, i));
+    // Pausa entre idiomas para evitar rate limit
+    if (i < langs.length - 1) await sleep(2000);
+  }
 
   aLog(log,'ok',`Dublagem concluída — ${langs.length} idioma(s)`);
   renderAudio(results);
@@ -1329,19 +1340,18 @@ async function callTTSSegmented(srt, voice, langCode, onProgress) {
     }
   }
 
-  // Processa em batches pequenos de 2 com pausa entre batches
-  const BATCH_SIZE = 2;
-  for (let i = 0; i < segments.length; i += BATCH_SIZE) {
-    const batch = segments.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(batch.map(async (seg) => {
-      if (!seg.text.trim()) return null;
-      return await callTTSWithRetry(seg.text, voice, langCode);
-    }));
-    results.forEach((blob, j) => { audioSegments[i + j] = blob; });
-    completed += batch.length;
+  // Processa sequencialmente com pausa de 1s entre segmentos para evitar 429
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    if (!seg.text.trim()) {
+      audioSegments[i] = null;
+    } else {
+      audioSegments[i] = await callTTSWithRetry(seg.text, voice, langCode);
+    }
+    completed++;
     onProgress && onProgress(Math.round(completed / segments.length * 85));
-    // Pequena pausa entre batches para evitar rate limit
-    if (i + BATCH_SIZE < segments.length) await sleep(500);
+    // Pausa de 1s entre segmentos para respeitar rate limit
+    if (i < segments.length - 1) await sleep(1000);
   }
 
   onProgress && onProgress(88);
