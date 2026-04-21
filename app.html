@@ -2653,6 +2653,33 @@ function backToStart() {
 // ════════════════════════════════════════
 setTimeout(() => {
   const restored = loadCfg();
+
+  // Garante https:// em todos os campos de URL ao carregar
+  const urlFields = ['cfgProxy', 'cfgContainerProxy'];
+  let needsSave = false;
+  urlFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value && el.value.trim() !== '' && !el.value.startsWith('http')) {
+      el.value = 'https://' + el.value.trim();
+      needsSave = true;
+    }
+  });
+
+  // Auto-detect Railway URL
+  const currentHost = window.location.hostname;
+  if (currentHost.includes('railway.app') || currentHost.includes('up.railway.app')) {
+    const containerField = document.getElementById('cfgContainerProxy');
+    if (containerField && (!containerField.value || !containerField.value.startsWith('https://'))) {
+      containerField.value = `https://${currentHost}`;
+      needsSave = true;
+    }
+  }
+
+  if (needsSave) {
+    saveCfg();
+    S.proxy = document.getElementById('cfgProxy')?.value || '';
+  }
+
   if (restored && S.proxy) {
     toast('Configurações restauradas automaticamente ✓', 'ok');
     testProxy(S.proxy);
