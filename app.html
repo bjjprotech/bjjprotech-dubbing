@@ -2567,11 +2567,28 @@ async function previewVoice(lang, voiceName, btn) {
 
   try {
     const lcode = { en:'en-US', es:'es-ES' }[lang];
-    const blob = await callTTS(PREVIEW_TEXTS[lang], voiceName, lcode);
+    
+    // Retry up to 3x with backoff for 429
+    let blob = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        blob = await callTTS(PREVIEW_TEXTS[lang], voiceName, lcode);
+        if (blob && blob.size >= 100) break;
+      } catch(e) {
+        if (e.message.includes('429') && attempt < 2) {
+          btn.innerHTML = `<span style="font-size:9px">aguard...</span>`;
+          await sleep((attempt + 1) * 10000); // 10s, 20s
+          continue;
+        }
+        throw e;
+      }
+    }
+    
+    if (!blob || blob.size < 100) throw new Error('Áudio não gerado após 3 tentativas');
     previewAudios[cacheKey] = blob;
     playBlob(blob, lang, voiceName, btn);
   } catch(e) {
-    toast(`Preview falhou: ${e.message.substring(0,50)}`, 'err');
+    toast(`Preview falhou: ${e.message.substring(0,60)}`, 'err');
     btn.innerHTML = origLabel;
     btn.disabled = false;
   }
