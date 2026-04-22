@@ -1181,15 +1181,15 @@ async function startDubbing() {
     piSub(`pb-d-${i}`, 'Enviando texto para TTS...');
     await animFill(`pf-d-${i}`, 20, 300);
 
-    const text = srtToText(S.srt[l] || S.srt.pt);
+    const srtForLang = S.srt[l] || '';
 
     try {
       if (S.geminiKey) {
-        // TTS em chunks de texto corrido — menos chamadas à API, sem 429
-        aLog(log,'in',`${flags[l]} Gerando TTS (texto corrido)...`);
-        const blob = await callTTSChunked(text, vmap[l], lcode[l], (pct) => {
+        // TTS por segmento SRT — sincronizado com timestamps, sem distorção
+        aLog(log,'in',`${flags[l]} Gerando TTS por segmento (${parseSrtSegments(srtForLang).length} segmentos)...`);
+        const blob = await callTTSSegmented(srtForLang, vmap[l], lcode[l], (pct) => {
           animFill(`pf-d-${i}`, 20 + pct * 0.75, 100);
-          piSub(`pb-d-${i}`, `TTS: ${pct}%`);
+          piSub(`pb-d-${i}`, `TTS: ${pct}% — segmento sincronizado`);
         });
         S.audioBlobs[l] = blob;
         aLog(log,'ok',`${flags[l]} Áudio: ${(blob.size/1024).toFixed(0)} KB`);
@@ -1308,7 +1308,7 @@ async function callTTSSegmented(srt, voice, langCode, onProgress) {
       } catch(e) {
         if (e.message.includes('429') && attempt < maxRetries - 1) {
           // Rate limit — aguarda tempo maior antes de tentar novamente
-          const waitMs = (attempt + 1) * 15000; // 15s, 30s, 45s
+          const waitMs = (attempt + 1) * 20000; // 20s, 40s, 60s
           await sleep(waitMs);
           continue;
         }
@@ -1328,7 +1328,7 @@ async function callTTSSegmented(srt, voice, langCode, onProgress) {
     completed++;
     onProgress && onProgress(Math.round(completed / segments.length * 85));
     // Pausa de 1s entre segmentos para respeitar rate limit
-    if (i < segments.length - 1) await sleep(1500);
+    if (i < segments.length - 1) await sleep(2000);
   }
 
   onProgress && onProgress(88);
