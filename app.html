@@ -949,7 +949,7 @@ async function startTranscription() {
   }
 
   aLog(log,'ok',`Transcrição PT-BR concluída — ${vids.length} vídeo(s)`);
-  S.srt.pt = reformatSrt(S.srt.pt); // aplica limite de 42 chars/linha
+  // S.srt.pt mantém o SRT original para o TTS usar o texto completo
   document.getElementById('srt-pt-view').innerHTML = parseSrt(S.srt.pt);
   document.getElementById('srt-panel').style.display = 'block';
   // Returns here — pipeline continues automatically
@@ -2213,9 +2213,9 @@ async function startAutoUpload() {
       continue;
     }
 
-    // Build SRTs object
+    // Build SRTs object — apply reformatSrt here for caption display
     const srts = {};
-    [...S.langs].forEach(l => { if (S.srt[l]) srts[l] = S.srt[l]; });
+    [...S.langs].forEach(l => { if (S.srt[l]) srts[l] = reformatSrt(S.srt[l]); });
 
     // Submit job to container
     try {
