@@ -1201,7 +1201,7 @@ async function startDubbing() {
         piSub(`pb-d-${i}`, 'Simulação — configure Gemini API Key');
       }
     } catch(e) {
-      aLog(log,'wn',`${flags[l]} TTS falhou: ${e.message.substring(0,300)}`);
+      aLog(log,'wn',`${flags[l]} TTS erro: ${e.message.substring(0,200)}`);
       S.audioBlobs[l] = null;
     }
 
@@ -1294,53 +1294,73 @@ async function callTTSSegmented(srt, voice, langCode, onProgress) {
 
   const segments = parseSrtSegments(srt);
   if (!segments.length) throw new Error('Nenhum segmento SRT encontrado');
+  // Filter segments with actual text
+  const validSegments = segments.filter(s => s.text.trim().length >= 3);
+  if (!validSegments.length) throw new Error('Nenhum segmento com texto válido');
 
   onProgress && onProgress(2);
 
   // Processa segmentos sequencialmente com retry para evitar 429
-  const audioSegments = new Array(segments.length);
+  const audioSegments = new Array(segsToProcess.length || segments.length);
   let completed = 0;
 
   async function callTTSWithRetry(text, voice, langCode, maxRetries = 3) {
+    // Skip very short segments that might cause issues
+    const cleanText = text.trim().replace(/[\[\]\(\)\*\_]/g, '').trim();
+    if (cleanText.length < 3) return null;
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        return await callTTS(text, voice, langCode);
+        const blob = await callTTS(cleanText, voice, langCode);
+        if (!blob || blob.size < 100) {
+          // Empty response — wait and retry
+          if (attempt < maxRetries - 1) {
+            await sleep(5000);
+            continue;
+          }
+          return null; // Skip this segment silently
+        }
+        return blob;
       } catch(e) {
         if (e.message.includes('429') && attempt < maxRetries - 1) {
-          // Rate limit — aguarda tempo maior antes de tentar novamente
           const waitMs = (attempt + 1) * 20000; // 20s, 40s, 60s
           await sleep(waitMs);
           continue;
         }
-        throw e;
+        if (e.message.includes('Áudio não retornado') && attempt < maxRetries - 1) {
+          await sleep(3000);
+          continue;
+        }
+        // For other errors, skip segment silently
+        return null;
       }
     }
+    return null;
   }
 
-  // Processa sequencialmente com pausa de 1s entre segmentos para evitar 429
+  // Processa sequencialmente com pausa entre segmentos
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i];
     if (!seg.text.trim()) {
       audioSegments[i] = null;
     } else {
-      audioSegments[i] = await callTTSWithRetry(seg.text, voice, langCode);
+      audioSegments[i] = await callTTSWithRetry(seg.text, voice, langCode); // seg already validated
     }
     completed++;
     onProgress && onProgress(Math.round(completed / segments.length * 85));
-    // Pausa de 1s entre segmentos para respeitar rate limit
     if (i < segments.length - 1) await sleep(2000);
   }
 
   onProgress && onProgress(88);
 
   // Monta o WAV final respeitando os timestamps do SRT
-  // Cada segmento começa no start_ms do SRT, com silêncio antes se necessário
-  const totalDurationMs = segments[segments.length - 1].end_ms + 500; // +500ms de margem
+  const segs = segsToProcess;
+  const totalDurationMs = segs[segs.length - 1].end_ms + 500;
   const totalSamples    = Math.floor(SAMPLE_RATE * totalDurationMs / 1000);
-  const outputPcm       = new Int16Array(totalSamples); // inicializado com zeros (silêncio)
+  const outputPcm       = new Int16Array(totalSamples); // zeros = silêncio
 
-  for (let i = 0; i < segments.length; i++) {
-    const seg  = segments[i];
+  for (let i = 0; i < segs.length; i++) {
+    const seg  = segs[i];
     const blob = audioSegments[i];
     if (!blob) continue;
 
@@ -1364,8 +1384,8 @@ async function callTTSSegmented(srt, voice, langCode, onProgress) {
 
     // Copia os samples do segmento para a posição correta
     // Se o áudio for maior que o slot, trunca para caber até o próximo segmento
-    const nextStart = i < segments.length - 1
-      ? Math.floor(SAMPLE_RATE * segments[i+1].start_ms / 1000)
+    const nextStart = i < segs.length - 1
+      ? Math.floor(SAMPLE_RATE * segs[i+1].start_ms / 1000)
       : totalSamples;
     const maxSamples = Math.min(pcmBytes.length, nextStart - startSample);
 
@@ -1439,19 +1459,8 @@ async function mergeWavBlobs(blobs) {
 }
 
 async function callTTS(text, voice, langCode) {
-  // Add voice instruction to text to help Gemini use correct voice characteristics
-  // This helps ensure masculine voices sound masculine
-  const voiceInstructions = {
-    'Charon': 'Speak in a deep, authoritative male voice.',
-    'Fenrir': 'Speak in a firm, direct male voice.',
-    'Orus':   'Speak in a deep, calm male voice.',
-    'Puck':   'Speak in an energetic, expressive male voice.',
-    'Kore':   'Speak in a clear, precise female voice.',
-    'Aoede':  'Speak in a soft, natural female voice.',
-  };
-  const instruction = voiceInstructions[voice] || '';
-  const textWithInstruction = instruction ? `[${instruction}]
-${text}` : text;
+  // Send text directly — [brackets] cause Gemini TTS to return empty audio
+  const textWithInstruction = text;
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key=${S.geminiKey}`,
