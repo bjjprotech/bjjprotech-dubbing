@@ -165,105 +165,77 @@ def parse_srt_timestamps(srt_content):
 
 def sync_audio_to_srt(wav_path, srt_content, tmp, lang):
     """
-    Syncs dubbed WAV to SRT timestamps using FFmpeg.
-    The dubbed audio (text corrido) is split into segments matching SRT timing.
-    Each segment is placed at the correct timestamp with silence between.
+    Syncs dubbed WAV to SRT timestamps.
+    Strategy: 
+    1. Get total dubbed audio duration
+    2. Stretch/compress audio to match total video duration using atempo
+    3. Result: dubbed voice covers the entire video duration proportionally
     """
-    import math
+    import json as _json
+
     segments = parse_srt_timestamps(srt_content)
     if not segments: return None
 
-    total_ms = segments[-1][1] + 500
-    total_s  = total_ms / 1000.0
+    # Total video duration from SRT
+    video_total_ms = segments[-1][1]
+    video_total_s  = video_total_ms / 1000.0
+    if video_total_s <= 0: return None
 
-    # Get duration of dubbed audio
+    # Get dubbed audio duration via ffprobe
     probe = subprocess.run([
         'ffprobe', '-v', 'quiet', '-print_format', 'json',
         '-show_streams', str(wav_path)
     ], capture_output=True, text=True)
 
-    import json as _json
     try:
         probe_data = _json.loads(probe.stdout)
         dub_duration_s = float(probe_data['streams'][0]['duration'])
-    except:
-        log(f"  Sync {lang}: não foi possível determinar duração, usando sem sync")
+    except Exception as e:
+        log(f"  Sync {lang}: ffprobe falhou ({e}), usando sem sync")
         return None
 
-    # Total text duration from SRT
-    text_total_ms = sum(e - s for s, e, _ in segments)
-    text_total_s  = text_total_ms / 1000.0
+    if dub_duration_s <= 0: return None
 
-    if text_total_s <= 0: return None
+    # Calculate speed ratio to match video duration
+    speed_ratio = dub_duration_s / video_total_s
+    log(f"  Sync {lang}: dub={dub_duration_s:.1f}s video={video_total_s:.1f}s ratio={speed_ratio:.3f}")
 
-    # Build FFmpeg filter to place audio segments at correct timestamps
-    # Strategy: split dubbed audio proportionally by segment text length
-    # and place each piece at the correct SRT timestamp
-    total_chars = sum(len(t) for _, _, t in segments)
-    if total_chars == 0: return None
-
-    # Create silent base track
-    silence_path = tmp / f'silence_{lang}.wav'
-    result = subprocess.run([
-        'ffmpeg', '-y',
-        '-f', 'lavfi', '-i', f'anullsrc=channel_layout=mono:sample_rate=44100',
-        '-t', str(total_s + 1),
-        str(silence_path)
-    ], capture_output=True, timeout=60)
-    if result.returncode != 0: return None
-
-    # Extract segments from dubbed audio based on proportional timing
-    segment_files = []
-    current_pos_s = 0.0
-    for i, (start_ms, end_ms, text) in enumerate(segments):
-        char_ratio = len(text) / total_chars
-        seg_dur_s  = dub_duration_s * char_ratio
-
-        seg_path = tmp / f'seg_{lang}_{i}.wav'
-        result = subprocess.run([
-            'ffmpeg', '-y',
-            '-i', str(wav_path),
-            '-ss', str(current_pos_s),
-            '-t',  str(seg_dur_s),
-            '-ar', '44100', '-ac', '1',
-            str(seg_path)
-        ], capture_output=True, timeout=60)
-
-        if result.returncode == 0:
-            segment_files.append((start_ms / 1000.0, seg_path))
-
-        current_pos_s += seg_dur_s
-
-    if not segment_files: return None
-
-    # Mix all segments into the silence base at correct timestamps
-    # Build amix filter
-    inputs = ['-i', str(silence_path)]
-    for _, seg_path in segment_files:
-        inputs += ['-i', str(seg_path)]
-
-    filter_parts = []
-    for i, (ts, _) in enumerate(segment_files):
-        filter_parts.append(f'[{i+1}]adelay={int(ts*1000)}|{int(ts*1000)}[d{i}]')
-
-    mix_inputs = '[0]' + ''.join(f'[d{i}]' for i in range(len(segment_files)))
-    filter_parts.append(f'{mix_inputs}amix=inputs={len(segment_files)+1}:normalize=0[out]')
-
-    filter_str = ';'.join(filter_parts)
+    # atempo accepts 0.5 to 2.0 — chain filters if outside range
+    def build_atempo(ratio):
+        filters = []
+        r = ratio
+        while r > 2.0:
+            filters.append('atempo=2.0')
+            r /= 2.0
+        while r < 0.5:
+            filters.append('atempo=0.5')
+            r *= 2.0
+        filters.append(f'atempo={r:.4f}')
+        return ','.join(filters)
 
     synced_path = tmp / f'synced_{lang}.wav'
-    cmd = ['ffmpeg', '-y'] + inputs + [
-        '-filter_complex', filter_str,
-        '-map', '[out]',
+
+    if abs(speed_ratio - 1.0) < 0.02:
+        # Already close enough — just copy
+        import shutil
+        shutil.copy(str(wav_path), str(synced_path))
+        log(f"  Sync {lang}: sem ajuste necessário")
+        return synced_path
+
+    atempo_filter = build_atempo(speed_ratio)
+    cmd = [
+        'ffmpeg', '-y',
+        '-i', str(wav_path),
+        '-filter:a', atempo_filter,
         '-ar', '44100', '-ac', '1',
         str(synced_path)
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
     if result.returncode != 0:
-        log(f"  Sync {lang} FFmpeg erro: {result.stderr[-200:]}")
+        log(f"  Sync {lang} erro: {result.stderr[-200:]}")
         return None
 
-    log(f"  Sync {lang}: {synced_path.stat().st_size//1024}KB sincronizado")
+    log(f"  Sync {lang}: {synced_path.stat().st_size//1024}KB (ratio {speed_ratio:.3f})")
     return synced_path
 
 def wait_for_encoding(video_guid, library_id, api_key, timeout_min=30):
