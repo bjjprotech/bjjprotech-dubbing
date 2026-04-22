@@ -1166,7 +1166,9 @@ async function startDubbing() {
 
   const audioItems = [];
 
-  // Processa idiomas sequencialmente para evitar rate limit 429
+  // Aguarda 15s para resetar rate limit após transcrição/tradução
+  aLog(log,'in','Aguardando rate limit resetar (15s)...');
+  await sleep(15000);
   aLog(log,'in',`Iniciando dublagem — ${langs.length} idiomas em sequência...`);
 
   const results = [];
@@ -1198,7 +1200,7 @@ async function startDubbing() {
         piSub(`pb-d-${i}`, 'Simulação — configure Gemini API Key');
       }
     } catch(e) {
-      aLog(log,'wn',`${flags[l]} TTS falhou: ${e.message.substring(0,55)}`);
+      aLog(log,'wn',`${flags[l]} TTS falhou: ${e.message.substring(0,300)}`);
       S.audioBlobs[l] = null;
     }
 
@@ -1305,7 +1307,7 @@ async function callTTSSegmented(srt, voice, langCode, onProgress) {
       } catch(e) {
         if (e.message.includes('429') && attempt < maxRetries - 1) {
           // Rate limit — aguarda tempo maior antes de tentar novamente
-          const waitMs = (attempt + 1) * 10000; // 10s, 20s, 30s
+          const waitMs = (attempt + 1) * 15000; // 15s, 30s, 45s
           await sleep(waitMs);
           continue;
         }
