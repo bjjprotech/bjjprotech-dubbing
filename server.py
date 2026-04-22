@@ -165,23 +165,23 @@ def parse_srt_timestamps(srt_content):
 
 def sync_audio_to_srt(wav_path, srt_content, tmp, lang):
     """
-    Syncs dubbed WAV to SRT timestamps.
-    Strategy: 
-    1. Get total dubbed audio duration
-    2. Stretch/compress audio to match total video duration using atempo
-    3. Result: dubbed voice covers the entire video duration proportionally
+    Syncs dubbed WAV to video duration using SRT timestamps.
+    
+    Strategy:
+    - If ratio > 0.85: use atempo (small adjustment, good quality)
+    - If ratio < 0.85: insert silences at natural pause points from SRT gaps
+      This preserves audio quality while filling the correct duration
     """
-    import json as _json
+    import json as _json, shutil
 
     segments = parse_srt_timestamps(srt_content)
     if not segments: return None
 
-    # Total video duration from SRT
     video_total_ms = segments[-1][1]
     video_total_s  = video_total_ms / 1000.0
     if video_total_s <= 0: return None
 
-    # Get dubbed audio duration via ffprobe
+    # Get dubbed audio duration
     probe = subprocess.run([
         'ffprobe', '-v', 'quiet', '-print_format', 'json',
         '-show_streams', str(wav_path)
@@ -191,51 +191,144 @@ def sync_audio_to_srt(wav_path, srt_content, tmp, lang):
         probe_data = _json.loads(probe.stdout)
         dub_duration_s = float(probe_data['streams'][0]['duration'])
     except Exception as e:
-        log(f"  Sync {lang}: ffprobe falhou ({e}), usando sem sync")
+        log(f"  Sync {lang}: ffprobe falhou, sem sync")
         return None
 
     if dub_duration_s <= 0: return None
 
-    # Calculate speed ratio to match video duration
     speed_ratio = dub_duration_s / video_total_s
     log(f"  Sync {lang}: dub={dub_duration_s:.1f}s video={video_total_s:.1f}s ratio={speed_ratio:.3f}")
 
-    # atempo accepts 0.5 to 2.0 — chain filters if outside range
-    def build_atempo(ratio):
-        filters = []
-        r = ratio
-        while r > 2.0:
-            filters.append('atempo=2.0')
-            r /= 2.0
-        while r < 0.5:
-            filters.append('atempo=0.5')
-            r *= 2.0
-        filters.append(f'atempo={r:.4f}')
-        return ','.join(filters)
-
     synced_path = tmp / f'synced_{lang}.wav'
 
-    if abs(speed_ratio - 1.0) < 0.02:
-        # Already close enough — just copy
-        import shutil
+    # No adjustment needed
+    if abs(speed_ratio - 1.0) < 0.05:
         shutil.copy(str(wav_path), str(synced_path))
         log(f"  Sync {lang}: sem ajuste necessário")
         return synced_path
 
-    atempo_filter = build_atempo(speed_ratio)
-    cmd = [
-        'ffmpeg', '-y',
-        '-i', str(wav_path),
-        '-filter:a', atempo_filter,
-        '-ar', '44100', '-ac', '1',
-        str(synced_path)
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-    if result.returncode != 0:
-        log(f"  Sync {lang} erro: {result.stderr[-200:]}")
+    # Small adjustment (0.85-1.15): use atempo for best quality
+    if 0.85 <= speed_ratio <= 1.15:
+        cmd = ['ffmpeg', '-y', '-i', str(wav_path),
+               '-filter:a', f'atempo={speed_ratio:.4f}',
+               '-ar', '44100', '-ac', '1', str(synced_path)]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode == 0:
+            log(f"  Sync {lang}: atempo OK {synced_path.stat().st_size//1024}KB")
+            return synced_path
+
+    # Large adjustment: insert silences at SRT gap points
+    # Calculate how much silence to add in total
+    silence_needed_s = video_total_s - dub_duration_s
+    if silence_needed_s < 0:
+        # Audio is longer than video — use atempo to compress slightly
+        def build_atempo(ratio):
+            filters = []
+            r = ratio
+            while r > 2.0:
+                filters.append('atempo=2.0')
+                r /= 2.0
+            while r < 0.5:
+                filters.append('atempo=0.5')
+                r *= 2.0
+            filters.append(f'atempo={r:.4f}')
+            return ','.join(filters)
+        cmd = ['ffmpeg', '-y', '-i', str(wav_path),
+               '-filter:a', build_atempo(speed_ratio),
+               '-ar', '44100', '-ac', '1', str(synced_path)]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode == 0:
+            log(f"  Sync {lang}: compress OK")
+            return synced_path
         return None
 
-    log(f"  Sync {lang}: {synced_path.stat().st_size//1024}KB (ratio {speed_ratio:.3f})")
+    # Find natural pause points from SRT (gaps between segments)
+    gaps = []
+    for i in range(1, len(segments)):
+        gap_ms = segments[i][0] - segments[i-1][1]
+        if gap_ms > 200:  # gaps > 200ms
+            gaps.append((segments[i-1][1] / 1000.0, gap_ms / 1000.0))
+
+    total_gap_time = sum(g for _, g in gaps)
+
+    if not gaps or total_gap_time < 0.5:
+        # No good gaps — just pad silence at the end
+        cmd = ['ffmpeg', '-y',
+               '-i', str(wav_path),
+               '-f', 'lavfi', '-i', f'anullsrc=channel_layout=mono:sample_rate=44100',
+               '-filter_complex', f'[0][1]concat=n=2:v=0:a=1[out]',
+               '-map', '[out]',
+               '-t', str(video_total_s),
+               '-ar', '44100', '-ac', '1', str(synced_path)]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode == 0:
+            log(f"  Sync {lang}: pad silence OK")
+            return synced_path
+        return None
+
+    # Distribute silence proportionally across natural pause points
+    # Split audio at gap positions, insert scaled silence between segments
+    audio_segments = []
+    prev_pos = 0.0
+    chars_total = sum(len(t) for _, _, t in segments)
+
+    for i, (gap_pos_s, gap_dur_s) in enumerate(gaps):
+        # Position in dubbed audio (proportional to chars spoken so far)
+        chars_so_far = sum(len(t) for s, e, t in segments if e/1000.0 <= gap_pos_s)
+        dub_pos_s = dub_duration_s * (chars_so_far / chars_total) if chars_total > 0 else gap_pos_s
+
+        seg_path = tmp / f'aseg_{lang}_{i}.wav'
+        dur = dub_pos_s - prev_pos
+        if dur > 0.1:
+            r = subprocess.run(['ffmpeg', '-y', '-i', str(wav_path),
+                '-ss', f'{prev_pos:.3f}', '-t', f'{dur:.3f}',
+                '-ar', '44100', '-ac', '1', str(seg_path)],
+                capture_output=True, timeout=60)
+            if r.returncode == 0:
+                # Scale silence to add
+                sil_scale = gap_dur_s / total_gap_time
+                sil_dur = silence_needed_s * sil_scale
+                audio_segments.append((seg_path, sil_dur))
+        prev_pos = dub_pos_s
+
+    # Add final segment
+    final_path = tmp / f'aseg_{lang}_final.wav'
+    remaining = dub_duration_s - prev_pos
+    if remaining > 0.1:
+        r = subprocess.run(['ffmpeg', '-y', '-i', str(wav_path),
+            '-ss', f'{prev_pos:.3f}', '-t', f'{remaining:.3f}',
+            '-ar', '44100', '-ac', '1', str(final_path)],
+            capture_output=True, timeout=60)
+        if r.returncode == 0:
+            audio_segments.append((final_path, 0))
+
+    if not audio_segments:
+        log(f"  Sync {lang}: sem segmentos, usando original")
+        return None
+
+    # Build concat list with silence inserted
+    concat_list = tmp / f'concat_{lang}.txt'
+    with open(concat_list, 'w') as f:
+        for seg_path, sil_dur in audio_segments:
+            f.write(f"file '{seg_path}'\n")
+            if sil_dur > 0.05:
+                sil_path = tmp / f'sil_{lang}_{audio_segments.index((seg_path,sil_dur))}.wav'
+                r = subprocess.run(['ffmpeg', '-y',
+                    '-f', 'lavfi', '-i', f'anullsrc=channel_layout=mono:sample_rate=44100',
+                    '-t', f'{sil_dur:.3f}', str(sil_path)],
+                    capture_output=True, timeout=30)
+                if r.returncode == 0:
+                    f.write(f"file '{sil_path}'\n")
+
+    cmd = ['ffmpeg', '-y', '-f', 'concat', '-safe', '0',
+           '-i', str(concat_list),
+           '-ar', '44100', '-ac', '1', str(synced_path)]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    if result.returncode != 0:
+        log(f"  Sync {lang} concat erro: {result.stderr[-200:]}")
+        return None
+
+    log(f"  Sync {lang}: {synced_path.stat().st_size//1024}KB (silences inseridos)")
     return synced_path
 
 def wait_for_encoding(video_guid, library_id, api_key, timeout_min=30):
@@ -330,13 +423,46 @@ def process_job(job_id, payload):
             lang_labels = {t['lang']: t['label'] for t in audio_tracks}
             srts_data   = payload.get('srts_audio', {})  # SRT per lang for sync
 
-            # If SRT data provided, sync each audio track to SRT timestamps
+            # TTS por segmento já produz WAV com timing correto
+            # Sync via atempo apenas se necessário (pequenos ajustes)
+            import json as _json
             for lang in lang_order:
-                if lang in srts_data and srts_data[lang] and lang in wav_paths:
-                    synced = sync_audio_to_srt(wav_paths[lang], srts_data[lang], tmp, lang)
-                    if synced:
-                        wav_paths[lang] = synced
-                        log(f"  Sync SRT {lang.upper()}: OK")
+                if lang not in wav_paths: continue
+                try:
+                    probe = subprocess.run([
+                        'ffprobe', '-v', 'quiet', '-print_format', 'json',
+                        '-show_streams', str(wav_paths[lang])
+                    ], capture_output=True, text=True)
+                    probe_data = _json.loads(probe.stdout)
+                    dub_dur = float(probe_data['streams'][0]['duration'])
+                    
+                    # Get video duration
+                    probe2 = subprocess.run([
+                        'ffprobe', '-v', 'quiet', '-print_format', 'json',
+                        '-show_streams', '-select_streams', 'v',
+                        str(orig_path)
+                    ], capture_output=True, text=True)
+                    probe2_data = _json.loads(probe2.stdout)
+                    vid_dur = float(probe2_data['streams'][0]['duration'])
+                    
+                    ratio = dub_dur / vid_dur
+                    log(f"  {lang.upper()}: dub={dub_dur:.1f}s vid={vid_dur:.1f}s ratio={ratio:.3f}")
+                    
+                    # Only apply atempo for small adjustments (±15%)
+                    if 0.85 <= ratio <= 1.15 and abs(ratio - 1.0) > 0.02:
+                        synced_path = tmp / f'synced_{lang}.wav'
+                        r = subprocess.run([
+                            'ffmpeg', '-y', '-i', str(wav_paths[lang]),
+                            '-filter:a', f'atempo={ratio:.4f}',
+                            '-ar', '44100', '-ac', '1', str(synced_path)
+                        ], capture_output=True, timeout=300)
+                        if r.returncode == 0:
+                            wav_paths[lang] = synced_path
+                            log(f"  {lang.upper()}: atempo ajuste fino OK")
+                    elif ratio < 0.85 or ratio > 1.15:
+                        log(f"  {lang.upper()}: ratio {ratio:.3f} fora do range, sem ajuste")
+                except Exception as e:
+                    log(f"  {lang.upper()}: probe falhou: {e}")
 
             LANG_ISO = {'pt':'por','en':'eng','es':'spa','fr':'fra'}
 
