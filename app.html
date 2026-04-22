@@ -1168,8 +1168,8 @@ async function startDubbing() {
   const audioItems = [];
 
   // Aguarda 15s para resetar rate limit após transcrição/tradução
-  aLog(log,'in','Aguardando rate limit resetar (15s)...');
-  await sleep(15000);
+  aLog(log,'in','Aguardando rate limit resetar (30s)...');
+  await sleep(30000);
   aLog(log,'in',`Iniciando dublagem — ${langs.length} idiomas em sequência...`);
 
   const results = [];
@@ -1209,8 +1209,11 @@ async function startDubbing() {
     piSt(i,'d','ok','✓ concluído');
     return { l, voice:vmap[l], flag:flags[l] };
     })(l, i));
-    // Pausa entre idiomas para evitar rate limit
-    if (i < langs.length - 1) await sleep(2000);
+    // Pausa entre idiomas — 60s para quota do TTS resetar após processar EN
+    if (i < langs.length - 1) {
+      aLog(log, 'in', `Aguardando quota TTS resetar antes do próximo idioma (60s)...`);
+      await sleep(60000);
+    }
   }
 
   aLog(log,'ok',`Dublagem concluída — ${langs.length} idioma(s)`);
@@ -2038,7 +2041,7 @@ function reformatSrt(srt) {
   // Timestamps distributed proportionally by word count
   if (!srt) return srt;
 
-  const MAX_WORDS_PER_BLOCK = 12; // ~2 lines of natural speech
+  const MAX_WORDS_PER_BLOCK = 8; // shorter blocks = faster subtitle changes
 
   function tsToMs(ts) {
     const m = ts.match(/(\d+):(\d+):(\d+)[,\.](\d+)/);
@@ -2102,6 +2105,14 @@ function reformatSrt(srt) {
 
   // Sort by start time and renumber
   newBlocks.sort((a, b) => a.start - b.start);
+
+  // Ensure no overlaps — each block ends before the next starts
+  for (let i = 0; i < newBlocks.length - 1; i++) {
+    if (newBlocks[i].end > newBlocks[i+1].start) {
+      newBlocks[i].end = newBlocks[i+1].start - 1;
+    }
+  }
+
   return newBlocks.map((b, i) =>
     `${i+1}\n${msToTs(b.start)} --> ${msToTs(b.end)}\n${b.text}`
   ).join('\n\n') + '\n\n';
