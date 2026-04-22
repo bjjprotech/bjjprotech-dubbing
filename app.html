@@ -949,6 +949,7 @@ async function startTranscription() {
   }
 
   aLog(log,'ok',`Transcrição PT-BR concluída — ${vids.length} vídeo(s)`);
+  S.srt.pt = reformatSrt(S.srt.pt); // aplica limite de 42 chars/linha
   document.getElementById('srt-pt-view').innerHTML = parseSrt(S.srt.pt);
   document.getElementById('srt-panel').style.display = 'block';
   // Returns here — pipeline continues automatically
@@ -2048,14 +2049,21 @@ function formatSrtLines(text, maxChars = 42) {
 }
 
 function reformatSrt(srt) {
-  // Reformats SRT to have max 42 chars per line, 2 lines max
+  // Reformats SRT: max 42 chars per line, 2 lines max, clean encoding
   if (!srt) return srt;
-  return srt.trim().split(/\n\n+/).map(block => {
+  const blocks = srt.trim().split(/\n\n+/);
+  const result = blocks.map((block, idx) => {
     const lines = block.trim().split('\n');
-    if (lines.length < 3) return block;
-    const text = lines.slice(2).join(' ');
-    return `${lines[0]}\n${lines[1]}\n${formatSrtLines(text)}`;
-  }).join('\n\n') + '\n\n';
+    if (lines.length < 3) return null;
+    // Ensure sequential numbering
+    const timeLine = lines[1];
+    // Validate timestamp format
+    if (!timeLine.includes('-->')) return null;
+    const text = lines.slice(2).join(' ').trim();
+    if (!text) return null;
+    return `${idx + 1}\n${timeLine}\n${formatSrtLines(text)}`;
+  }).filter(Boolean);
+  return result.join('\n\n') + '\n\n';
 }
 
 function mockSrt(title, off=0) {
@@ -2167,7 +2175,8 @@ async function startAutoUpload() {
           video_guid:  v.guid,
           video_title: v.title,
           audio_tracks: audioTracks,
-          srts
+          srts,
+          srts_audio: srts  // SRT timestamps for audio sync in Railway
         })
       });
 
