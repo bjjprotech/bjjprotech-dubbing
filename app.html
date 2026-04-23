@@ -1129,7 +1129,7 @@ RULES: Return ONLY the translated SRT file. Keep timestamps and sequence numbers
 BJJ terms: guarda→guard/guardia, raspagem→sweep/barrido, passagem→guard pass/pasada, finalização→submission/sumisión, mata-leão→rear naked choke/mata-león. Keep: kimura, americana, omoplata, berimbolo.
 
 ${srtPt}` }]}],
-        generationConfig:{ temperature:0.2, maxOutputTokens:8192 }
+        generationConfig:{ temperature:0.2, maxOutputTokens:32768 }
       })
     }
   );
@@ -1389,10 +1389,25 @@ async function callTTSChunked(text, voice, langCode, onProgress) {
   const words = text.split(' ');
 
   if (words.length <= CHUNK_WORDS) {
-    onProgress && onProgress(50);
-    const blob = await callTTS(text, voice, langCode);
-    onProgress && onProgress(100);
-    return blob;
+    // Texto curto — processa direto com retry
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        onProgress && onProgress(30 + attempt * 20);
+        const blob = await callTTS(text, voice, langCode);
+        if (blob && blob.size >= 100) {
+          onProgress && onProgress(100);
+          return blob;
+        }
+        if (attempt < 2) await sleep(5000);
+      } catch(e) {
+        if (e.message.includes('429') && attempt < 2) {
+          await sleep((attempt + 1) * 15000);
+          continue;
+        }
+        throw e;
+      }
+    }
+    throw new Error('TTS não gerou áudio após 3 tentativas');
   }
 
   const chunks = [];
@@ -1407,7 +1422,22 @@ async function callTTSChunked(text, voice, langCode, onProgress) {
   for (let i = 0; i < chunks.length; i += CONCURRENCY) {
     const batch = chunks.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.all(
-      batch.map((chunk) => callTTS(chunk, voice, langCode))
+      batch.map(async (chunk) => {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const blob = await callTTS(chunk, voice, langCode);
+            if (blob && blob.size >= 100) return blob;
+            if (attempt < 2) await sleep(5000);
+          } catch(e) {
+            if (e.message.includes('429') && attempt < 2) {
+              await sleep((attempt + 1) * 15000);
+              continue;
+            }
+            if (attempt === 2) throw e;
+          }
+        }
+        throw new Error('Chunk TTS falhou após 3 tentativas');
+      })
     );
     batchResults.forEach((blob, j) => { blobs[i + j] = blob; });
     completed += batch.length;
@@ -1419,22 +1449,36 @@ async function callTTSChunked(text, voice, langCode, onProgress) {
   return merged;
 }
 
-// Concatena múltiplos WAV blobs
+// Concatena múltiplos blobs de áudio (PCM raw ou WAV)
+// Gemini TTS retorna PCM raw 16-bit 24kHz sem header
 async function mergeWavBlobs(blobs) {
+  const SAMPLE_RATE = 24000;
   const buffers = await Promise.all(blobs.map(b => b.arrayBuffer()));
-  const totalSize = buffers.reduce((a, b, i) => a + (i === 0 ? b.byteLength : b.byteLength - 44), 0);
-  const merged = new Uint8Array(totalSize);
-  let offset = 0;
-  buffers.forEach((buf, i) => {
-    const data = new Uint8Array(buf);
-    const start = i === 0 ? 0 : 44;
-    merged.set(data.subarray(start), offset);
-    offset += data.byteLength - (i === 0 ? 0 : 44);
+  
+  // Extrai apenas os bytes PCM de cada buffer (pula header WAV se existir)
+  const pcmBuffers = buffers.map(buf => {
+    const view = new DataView(buf);
+    const magic = String.fromCharCode(
+      view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3)
+    );
+    // Se tem header RIFF/WAV, pula os 44 bytes do header
+    if (magic === 'RIFF') return buf.slice(44);
+    // PCM raw — usa o buffer inteiro
+    return buf;
   });
-  const view = new DataView(merged.buffer);
-  view.setUint32(4,  totalSize - 8,  true);
-  view.setUint32(40, totalSize - 44, true);
-  return new Blob([merged], { type: 'audio/wav' });
+  
+  // Concatena todos os PCM
+  const totalPcmSize = pcmBuffers.reduce((a, b) => a + b.byteLength, 0);
+  const merged = new Uint8Array(totalPcmSize);
+  let offset = 0;
+  for (const pcm of pcmBuffers) {
+    merged.set(new Uint8Array(pcm), offset);
+    offset += pcm.byteLength;
+  }
+  
+  // Adiciona header WAV correto
+  const wavBytes = pcmToWav(merged.buffer, SAMPLE_RATE);
+  return new Blob([wavBytes], { type: 'audio/wav' });
 }
 
 async function callTTS(text, voice, langCode) {
