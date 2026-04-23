@@ -1181,15 +1181,16 @@ async function startDubbing() {
     piSub(`pb-d-${i}`, 'Enviando texto para TTS...');
     await animFill(`pf-d-${i}`, 20, 300);
 
-    const srtForLang = S.srt[l] || '';
+    const text = srtToText(S.srt[l] || S.srt.pt);
 
     try {
       if (S.geminiKey) {
-        // TTS por segmento SRT — sincronizado com timestamps, sem distorção
-        aLog(log,'in',`${flags[l]} Gerando TTS por segmento (${parseSrtSegments(srtForLang).length} segmentos)...`);
-        const blob = await callTTSSegmented(srtForLang, vmap[l], lcode[l], (pct) => {
+        // TTS em chunks de texto corrido — rápido, sem 429
+        // Sincronização de duração feita pelo Railway via atempo
+        aLog(log,'in',`${flags[l]} Gerando TTS...`);
+        const blob = await callTTSChunked(text, vmap[l], lcode[l], (pct) => {
           animFill(`pf-d-${i}`, 20 + pct * 0.75, 100);
-          piSub(`pb-d-${i}`, `TTS: ${pct}% — segmento sincronizado`);
+          piSub(`pb-d-${i}`, `TTS: ${pct}%`);
         });
         S.audioBlobs[l] = blob;
         aLog(log,'ok',`${flags[l]} Áudio: ${(blob.size/1024).toFixed(0)} KB`);
@@ -2036,19 +2037,16 @@ function formatSrtLines(text, maxChars = 42) {
 }
 
 function reformatSrt(srt) {
-  // Reformats SRT: splits long blocks into max 2-line blocks
-  // No character limit per line — player handles responsiveness
-  // Timestamps distributed proportionally by word count
+  // Apenas garante max 2 linhas por bloco SRT
+  // Não fragmenta blocos — o player do Bunny cuida da exibição
+  // Corrige apenas blocos com mais de 2 linhas de texto
   if (!srt) return srt;
-
-  const MAX_WORDS_PER_BLOCK = 8; // shorter blocks = faster subtitle changes
 
   function tsToMs(ts) {
     const m = ts.match(/(\d+):(\d+):(\d+)[,\.](\d+)/);
     if (!m) return 0;
     return (+m[1])*3600000 + (+m[2])*60000 + (+m[3])*1000 + +m[4];
   }
-
   function msToTs(ms) {
     const h = Math.floor(ms/3600000);
     const m = Math.floor((ms%3600000)/60000);
@@ -2058,7 +2056,7 @@ function reformatSrt(srt) {
   }
 
   const blocks = srt.trim().split(/\n\n+/);
-  const newBlocks = [];
+  const result = [];
 
   for (const block of blocks) {
     const lines = block.trim().split('\n');
@@ -2066,56 +2064,25 @@ function reformatSrt(srt) {
     const timeLine = lines[1];
     if (!timeLine.includes('-->')) continue;
 
-    const [startTs, endTs] = timeLine.split('-->').map(s => s.trim());
-    const startMs = tsToMs(startTs);
-    const endMs   = tsToMs(endTs);
-    const durMs   = endMs - startMs;
-    if (durMs <= 0) continue;
-
+    // Join all text lines into one, then split into max 2 lines naturally
     const fullText = lines.slice(2).join(' ').trim();
     if (!fullText) continue;
 
+    // Split into max 2 lines at natural midpoint if text is long
+    let displayText = fullText;
     const words = fullText.split(/\s+/);
-    const totalWords = words.length;
-
-    // Split into chunks of MAX_WORDS_PER_BLOCK words
-    const chunks = [];
-    for (let i = 0; i < words.length; i += MAX_WORDS_PER_BLOCK) {
-      chunks.push(words.slice(i, i + MAX_WORDS_PER_BLOCK).join(' '));
+    if (words.length > 6) {
+      // Find natural midpoint
+      const mid = Math.ceil(words.length / 2);
+      const line1 = words.slice(0, mid).join(' ');
+      const line2 = words.slice(mid).join(' ');
+      displayText = `${line1}\n${line2}`;
     }
 
-    if (chunks.length === 0) continue;
-
-    // Distribute timestamp proportionally by word count
-    let currentMs = startMs;
-    for (const chunk of chunks) {
-      const chunkWords = chunk.split(/\s+/).length;
-      const ratio = chunkWords / totalWords;
-      const chunkDur = Math.round(durMs * ratio);
-      const chunkEnd = Math.min(currentMs + chunkDur, endMs);
-
-      newBlocks.push({
-        start: currentMs,
-        end: chunkEnd,
-        text: chunk
-      });
-      currentMs = chunkEnd;
-    }
+    result.push(`${result.length + 1}\n${timeLine}\n${displayText}`);
   }
 
-  // Sort by start time and renumber
-  newBlocks.sort((a, b) => a.start - b.start);
-
-  // Ensure no overlaps — each block ends before the next starts
-  for (let i = 0; i < newBlocks.length - 1; i++) {
-    if (newBlocks[i].end > newBlocks[i+1].start) {
-      newBlocks[i].end = newBlocks[i+1].start - 1;
-    }
-  }
-
-  return newBlocks.map((b, i) =>
-    `${i+1}\n${msToTs(b.start)} --> ${msToTs(b.end)}\n${b.text}`
-  ).join('\n\n') + '\n\n';
+  return result.join('\n\n') + '\n\n';
 }
 
 function mockSrt(title, off=0) {
