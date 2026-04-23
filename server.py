@@ -374,10 +374,14 @@ def process_job(job_id, payload):
             update_job(job_id, progress=10, message='Baixando vídeo original...')
             orig_path = tmp / 'original.mp4'
             
-            # Tenta /original primeiro (arquivo fonte puro), fallback para play_720p.mp4
+            # Estratégia de download:
+            # 1. Tenta play_720p.mp4 PRIMEIRO — mais leve, sempre disponível
+            # 2. Se falhar, tenta /original — arquivo fonte mas pode ser muito grande
+            # Nota: após pipeline com multi-audio, play_720p ainda tem PT-BR como
+            # faixa principal (stream 0:a) pois o Bunny preserva a ordem das faixas
             urls_to_try = [
-                f"https://{cdn_host}/{video_guid}/original",
                 f"https://{cdn_host}/{video_guid}/play_720p.mp4",
+                f"https://{cdn_host}/{video_guid}/original",
                 f"https://{cdn_host}/{video_guid}/play_1080p.mp4",
             ]
             downloaded = False
@@ -385,13 +389,14 @@ def process_job(job_id, payload):
                 try:
                     log(f"  Tentando: {video_url.split('/')[-1]}")
                     download_file(video_url, orig_path)
-                    log(f"  Download OK: {orig_path.stat().st_size//1024//1024}MB")
+                    size_mb = orig_path.stat().st_size // 1024 // 1024
+                    log(f"  Download OK: {size_mb}MB")
                     downloaded = True
                     break
                 except Exception as e:
-                    log(f"  Falhou: {e}")
+                    log(f"  Falhou ({video_url.split('/')[-1]}): {e}")
             if not downloaded:
-                raise RuntimeError("Não foi possível baixar o vídeo original")
+                raise RuntimeError("Não foi possível baixar o vídeo")
 
             # 2. Salvar WAVs
             update_job(job_id, progress=35, message='Preparando faixas de áudio...')
@@ -490,9 +495,31 @@ def process_job(job_id, payload):
             for lang in lang_order:
                 cmd += ['-i', str(wav_paths[lang])]
 
-            # Mapear vídeo e todas as faixas de áudio
-            cmd += ['-map', '0:v']   # vídeo original — copiado sem alteração
-            cmd += ['-map', '0:a']   # áudio PT-BR original — copiado sem alteração
+            # Encontrar a faixa de áudio PT-BR pelo metadata de idioma
+            # Isso garante que sempre usamos o PT-BR correto mesmo que
+            # o vídeo já tenha sido processado antes com múltiplas faixas
+            pt_stream = '0:a' # default: primeira faixa
+            try:
+                probe_cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json',
+                             '-show_streams', '-select_streams', 'a', str(orig_path)]
+                probe_result = subprocess.run(probe_cmd, capture_output=True, text=True)
+                import json as _json2
+                probe_data = _json2.loads(probe_result.stdout)
+                for idx, stream in enumerate(probe_data.get('streams', [])):
+                    tags = stream.get('tags', {})
+                    lang = tags.get('language', '').lower()
+                    if lang in ('por', 'pt', 'pt-br', 'portuguese'):
+                        pt_stream = f'0:a:{idx}'
+                        log(f"  PT-BR encontrado: stream {idx} (language={lang})")
+                        break
+                else:
+                    log(f"  PT-BR não identificado por metadata, usando primeira faixa")
+            except Exception as e:
+                log(f"  Probe streams falhou ({e}), usando primeira faixa")
+
+            # Mapear vídeo e faixas de áudio
+            cmd += ['-map', '0:v']        # vídeo original — copiado sem alteração
+            cmd += ['-map', pt_stream]    # áudio PT-BR identificado por metadata
 
             for i in range(len(lang_order)):
                 cmd += ['-map', f'{i+1}:a']
@@ -506,12 +533,12 @@ def process_job(job_id, payload):
                 cmd += [f'-metadata:s:a:{idx}', f'language={iso}']
                 cmd += [f'-metadata:s:a:{idx}', f'title={label}']
 
-            # GARANTIA DE QUALIDADE:
-            # -c:v copy   → vídeo copiado bit a bit, zero perda de qualidade
-            # -c:a:0 copy → áudio PT-BR original copiado bit a bit, zero alteração
-            # Faixas EN/ES convertidas para AAC 128k (qualidade adequada para dublagem)
-            cmd += ['-c:v', 'copy']      # vídeo intocado
-            cmd += ['-c:a:0', 'copy']    # áudio PT-BR intocado
+            # Codecs:
+            # -c:v copy        → vídeo copiado bit a bit, zero perda
+            # -c:a:0 copy      → PT-BR copiado bit a bit, zero alteração
+            # EN/ES em AAC 128k
+            cmd += ['-c:v', 'copy']
+            cmd += ['-c:a:0', 'copy']
             for i in range(len(lang_order)):
                 cmd += [f'-c:a:{i+1}', 'aac', f'-b:a:{i+1}', '128k']
 
