@@ -369,12 +369,29 @@ def process_job(job_id, payload):
         with tempfile.TemporaryDirectory(prefix='bjjprotech_') as tmp:
             tmp = Path(tmp)
 
-            # 1. Download vídeo original
+            # 1. Download vídeo original — usa /original para garantir arquivo fonte puro
+            # /original = arquivo antes do encoding, não contém faixas dubladas de runs anteriores
             update_job(job_id, progress=10, message='Baixando vídeo original...')
-            video_url = f"https://{cdn_host}/{video_guid}/play_720p.mp4"
             orig_path = tmp / 'original.mp4'
-            log(f"  Download: {video_url}")
-            download_file(video_url, orig_path)
+            
+            # Tenta /original primeiro (arquivo fonte puro), fallback para play_720p.mp4
+            urls_to_try = [
+                f"https://{cdn_host}/{video_guid}/original",
+                f"https://{cdn_host}/{video_guid}/play_720p.mp4",
+                f"https://{cdn_host}/{video_guid}/play_1080p.mp4",
+            ]
+            downloaded = False
+            for video_url in urls_to_try:
+                try:
+                    log(f"  Tentando: {video_url.split('/')[-1]}")
+                    download_file(video_url, orig_path)
+                    log(f"  Download OK: {orig_path.stat().st_size//1024//1024}MB")
+                    downloaded = True
+                    break
+                except Exception as e:
+                    log(f"  Falhou: {e}")
+            if not downloaded:
+                raise RuntimeError("Não foi possível baixar o vídeo original")
 
             # 2. Salvar WAVs
             update_job(job_id, progress=35, message='Preparando faixas de áudio...')
